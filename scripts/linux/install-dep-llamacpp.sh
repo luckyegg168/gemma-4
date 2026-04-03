@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # =============================================================
 #  Gemma 4 - Install llama-cpp-python (GPU CUDA)
-#  GPU primary with CPU fallback
+#  GPU primary with CPU fallback.
+#  Auto-detects CPU instruction sets to avoid AVX512 SIGILL
+#  on CPUs that only support AVX2 (e.g. Ryzen 5000 series).
 # =============================================================
 set -euo pipefail
 
@@ -30,9 +32,9 @@ echo ""
 echo "[Step 2/5] Upgrading pip..."
 $PYTHON -m pip install --upgrade pip
 
-# --- Step 3: Detect CUDA ---
+# --- Step 3: Detect CUDA + CPU capabilities ---
 echo ""
-echo "[Step 3/5] Detecting CUDA GPU..."
+echo "[Step 3/5] Detecting CUDA GPU and CPU capabilities..."
 GPU_FOUND=false
 if command -v nvidia-smi &>/dev/null; then
     echo "[OK] nvidia-smi found."
@@ -42,41 +44,103 @@ elif command -v nvcc &>/dev/null; then
     echo "[OK] CUDA nvcc found: $(nvcc --version | grep release)"
     GPU_FOUND=true
 else
-    echo "[WARNING] No NVIDIA GPU detected."
-    echo "          llama.cpp will run on CPU only."
+    echo "[WARNING] No NVIDIA GPU detected — llama.cpp will run on CPU only."
+fi
+
+# Detect CPU instruction set support
+CPU_FLAGS=$(grep -m1 "^flags" /proc/cpuinfo 2>/dev/null || true)
+HAS_AVX512=false
+HAS_AVX2=false
+HAS_AVX=false
+echo "$CPU_FLAGS" | grep -q "avx512f" && HAS_AVX512=true || true
+echo "$CPU_FLAGS" | grep -q " avx2 "  && HAS_AVX2=true  || true
+echo "$CPU_FLAGS" | grep -q " avx "   && HAS_AVX=true   || true
+
+echo "[INFO] CPU AVX512=$HAS_AVX512  AVX2=$HAS_AVX2  AVX=$HAS_AVX"
+
+# Build CMAKE_ARGS for source build matching this CPU
+CUDA_ARGS="-DGGML_CUDA=on"
+if [ "$HAS_AVX512" = false ]; then
+    CUDA_ARGS="$CUDA_ARGS -DGGML_AVX512=OFF"
+fi
+if [ "$HAS_AVX2" = false ]; then
+    CUDA_ARGS="$CUDA_ARGS -DGGML_AVX2=OFF"
+fi
+if [ "$HAS_AVX" = false ]; then
+    CUDA_ARGS="$CUDA_ARGS -DGGML_AVX=OFF"
 fi
 
 # --- Step 4: Install llama-cpp-python ---
 echo ""
 echo "[Step 4/5] Installing llama-cpp-python..."
 
+PKG="llama-cpp-python[server]>=0.3.0"
+INSTALLED=false
+
+verify_import() {
+    # Returns 0 if import works without SIGILL
+    $PYTHON -c "from llama_cpp import Llama; print('import OK')" 2>/dev/null
+    return $?
+}
+
 if [ "$GPU_FOUND" = true ]; then
-    echo "[INFO] Attempting GPU build (CUDA 12.1 pre-built wheel)..."
-    if $PYTHON -m pip install "llama-cpp-python[server]>=0.3.0" \
+    echo "[INFO] Trying pre-built CUDA 12.1 wheel..."
+    if $PYTHON -m pip install "$PKG" \
         --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121 2>/dev/null; then
-        echo "[OK] GPU (CUDA 12.1) wheel installed."
-    else
-        echo "[INFO] CUDA 12.1 failed. Trying CUDA 11.8..."
-        if $PYTHON -m pip install "llama-cpp-python[server]>=0.3.0" \
-            --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu118 2>/dev/null; then
-            echo "[OK] GPU (CUDA 11.8) wheel installed."
+        if verify_import; then
+            echo "[OK] GPU (CUDA 12.1) wheel works."
+            INSTALLED=true
         else
-            echo "[INFO] Pre-built GPU wheels failed. Building from source with CUDA..."
-            export CMAKE_ARGS="-DGGML_CUDA=on"
-            export FORCE_CMAKE=1
-            if $PYTHON -m pip install "llama-cpp-python[server]>=0.3.0" --no-binary "llama-cpp-python" 2>/dev/null; then
-                echo "[OK] GPU source build successful."
+            echo "[WARNING] CUDA 12.1 wheel installed but crashed (likely AVX512 mismatch)."
+            echo "          Rebuilding from source for this CPU (AVX512=$HAS_AVX512 AVX2=$HAS_AVX2)..."
+        fi
+    fi
+
+    if [ "$INSTALLED" = false ]; then
+        echo "[INFO] Trying pre-built CUDA 11.8 wheel..."
+        if $PYTHON -m pip install "$PKG" \
+            --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu118 2>/dev/null; then
+            if verify_import; then
+                echo "[OK] GPU (CUDA 11.8) wheel works."
+                INSTALLED=true
             else
-                echo "[WARNING] GPU build failed. Falling back to CPU-only llama-cpp-python..."
+                echo "[WARNING] CUDA 11.8 wheel also crashed — building from source..."
+            fi
+        fi
+    fi
+
+    if [ "$INSTALLED" = false ]; then
+        echo "[INFO] Building llama-cpp-python from source with CUDA..."
+        echo "[INFO] CMAKE_ARGS: $CUDA_ARGS"
+        export CMAKE_ARGS="$CUDA_ARGS"
+        export FORCE_CMAKE=1
+        if $PYTHON -m pip install "$PKG" --no-binary "llama-cpp-python" --no-cache-dir; then
+            if verify_import; then
+                echo "[OK] GPU source build works."
+                INSTALLED=true
+            else
+                echo "[WARNING] Source GPU build also crashed — falling back to CPU-only."
                 GPU_FOUND=false
             fi
+        else
+            echo "[WARNING] GPU source build failed — falling back to CPU-only."
+            GPU_FOUND=false
         fi
     fi
 fi
 
-if [ "$GPU_FOUND" = false ]; then
-    echo "[INFO] Installing CPU-only llama-cpp-python..."
-    $PYTHON -m pip install "llama-cpp-python[server]>=0.3.0"
+if [ "$INSTALLED" = false ]; then
+    echo "[INFO] Installing CPU-only llama-cpp-python (source build for this CPU)..."
+    CPU_ARGS=""
+    [ "$HAS_AVX512" = false ] && CPU_ARGS="$CPU_ARGS -DGGML_AVX512=OFF"
+    [ "$HAS_AVX2"   = false ] && CPU_ARGS="$CPU_ARGS -DGGML_AVX2=OFF"
+    [ "$HAS_AVX"    = false ] && CPU_ARGS="$CPU_ARGS -DGGML_AVX=OFF"
+    if [ -n "$CPU_ARGS" ]; then
+        export CMAKE_ARGS="$CPU_ARGS"
+        $PYTHON -m pip install "$PKG" --no-binary "llama-cpp-python" --no-cache-dir
+    else
+        $PYTHON -m pip install "$PKG"
+    fi
     echo "[OK] CPU-only llama-cpp-python installed."
 fi
 
@@ -89,7 +153,7 @@ if $PYTHON -c "from llama_cpp import Llama; print('llama-cpp-python OK')" 2>/dev
     echo "  Next step: Run download-models.sh to get GGUF files."
     echo "             Then run start-llamacpp.sh to start chatting."
 else
-    echo "[ERROR] llama-cpp-python installation failed."
+    echo "[ERROR] llama-cpp-python import failed."
     echo "        Check CUDA/build tools and try again."
     exit 1
 fi

@@ -334,6 +334,30 @@ def install_base() -> None:
     print_activate_hint()
 
 
+def cpu_cmake_flags(cuda: bool = False) -> str:
+    """Build CMAKE_ARGS matching this CPU's instruction set support."""
+    try:
+        with open("/proc/cpuinfo") as f:
+            flags = f.read()
+    except Exception:
+        flags = ""
+    args = ["-DGGML_CUDA=on"] if cuda else []
+    if "avx512f" not in flags:
+        args.append("-DGGML_AVX512=OFF")
+    if " avx2 " not in flags:
+        args.append("-DGGML_AVX2=OFF")
+    if " avx " not in flags:
+        args.append("-DGGML_AVX=OFF")
+    return " ".join(args)
+
+
+def verify_llama_import() -> bool:
+    """Return True if llama_cpp imports without crashing (catches SIGILL)."""
+    r = run_capture([VENV_PYTHON, "-c",
+                     "from llama_cpp import Llama; print('OK')"])
+    return r.returncode == 0
+
+
 def install_llamacpp() -> None:
     banner("Gemma 4 — llama-cpp-python Installer (Linux, GPU CUDA)")
 
@@ -346,12 +370,23 @@ def install_llamacpp() -> None:
     pip("pip")
     ok("pip ready.")
 
-    step(3, 5, "Detecting NVIDIA GPU")
+    step(3, 5, "Detecting NVIDIA GPU + CPU capabilities")
     gpu_found = detect_nvidia_gpu()
     if gpu_found:
         ok("NVIDIA GPU detected — attempting GPU build.")
     else:
         warn("No NVIDIA GPU — installing CPU-only llama-cpp-python.")
+
+    # Report CPU flags
+    try:
+        with open("/proc/cpuinfo") as f:
+            cpu_text = f.read()
+        avx512 = "avx512f" in cpu_text
+        avx2   = " avx2 " in cpu_text
+        avx    = " avx "  in cpu_text
+        info(f"CPU: AVX512={avx512}  AVX2={avx2}  AVX={avx}")
+    except Exception:
+        pass
 
     step(4, 5, "Installing llama-cpp-python")
     pkg = "llama-cpp-python[server]>=0.3.0"
@@ -360,41 +395,56 @@ def install_llamacpp() -> None:
     if gpu_found:
         info("Trying pre-built CUDA 12.1 wheel...")
         if pip(pkg, extra_index="https://abetlen.github.io/llama-cpp-python/whl/cu121"):
-            ok("GPU (CUDA 12.1) wheel installed.")
-            installed = True
-        else:
-            info("CUDA 12.1 failed. Trying CUDA 11.8...")
-            if pip(pkg, extra_index="https://abetlen.github.io/llama-cpp-python/whl/cu118"):
-                ok("GPU (CUDA 11.8) wheel installed.")
+            if verify_llama_import():
+                ok("GPU (CUDA 12.1) wheel works.")
                 installed = True
             else:
-                info("Pre-built wheels failed. Building from source with CUDA...")
-                check_system_packages()
-                if pip(pkg, no_binary="llama-cpp-python",
-                       env_extra={"CMAKE_ARGS": "-DGGML_CUDA=on", "FORCE_CMAKE": "1"}):
-                    ok("GPU source build successful.")
+                warn("CUDA 12.1 wheel crashed (likely AVX512 mismatch) — rebuilding from source...")
+
+        if not installed:
+            info("Trying pre-built CUDA 11.8 wheel...")
+            if pip(pkg, extra_index="https://abetlen.github.io/llama-cpp-python/whl/cu118"):
+                if verify_llama_import():
+                    ok("GPU (CUDA 11.8) wheel works.")
                     installed = True
                 else:
-                    warn("GPU source build failed — falling back to CPU-only.")
+                    warn("CUDA 11.8 wheel also crashed — building from source for this CPU...")
+
+        if not installed:
+            cmake = cpu_cmake_flags(cuda=True)
+            info(f"Building from source. CMAKE_ARGS: {cmake}")
+            check_system_packages()
+            if pip(pkg, no_binary="llama-cpp-python",
+                   env_extra={"CMAKE_ARGS": cmake, "FORCE_CMAKE": "1"}):
+                if verify_llama_import():
+                    ok("GPU source build works.")
+                    installed = True
+                else:
+                    warn("Source GPU build crashed — falling back to CPU-only.")
                     gpu_found = False
+            else:
+                warn("GPU source build failed — falling back to CPU-only.")
+                gpu_found = False
 
     if not installed:
-        info("Installing CPU-only llama-cpp-python...")
-        if pip(pkg):
-            ok("CPU-only llama-cpp-python installed.")
+        cmake = cpu_cmake_flags(cuda=False)
+        if cmake.strip():
+            info(f"CPU source build. CMAKE_ARGS: {cmake}")
+            if not pip(pkg, no_binary="llama-cpp-python",
+                       env_extra={"CMAKE_ARGS": cmake}):
+                error("llama-cpp-python installation failed.")
+                sys.exit(1)
         else:
-            error("llama-cpp-python installation failed.")
-            sys.exit(1)
+            if not pip(pkg):
+                error("llama-cpp-python installation failed.")
+                sys.exit(1)
+        ok("CPU-only llama-cpp-python installed.")
 
     step(5, 5, "Verifying installation")
-    r = run_capture([VENV_PYTHON, "-c",
-                     "from llama_cpp import Llama; print('llama-cpp-python OK')"])
-    if r.returncode == 0:
-        ok(r.stdout.strip())
+    if verify_llama_import():
+        ok("llama-cpp-python is ready.")
     else:
-        error("Verification failed — check CUDA/build tools and retry.")
-        if r.stderr:
-            print(r.stderr[:500])
+        error("Verification failed — import crashed. Check CUDA/build tools and retry.")
         sys.exit(1)
 
     print(f"\n{SEP}")
