@@ -72,7 +72,7 @@ if errorlevel 1 (
     echo       llama-cpp-python not found.
     set /p INSTALL_LLAMA="    Install llama-cpp-python for GGUF support? [y/N]: "
     if /i "!INSTALL_LLAMA!"=="y" (
-        echo       Installing llama-cpp-python (CPU only)...
+        echo       Installing llama-cpp-python (CPU only)
         python -m pip install llama-cpp-python
         if errorlevel 1 (
             echo [WARNING] llama-cpp-python install failed.
