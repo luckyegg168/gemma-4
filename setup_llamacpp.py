@@ -145,13 +145,15 @@ def ask(prompt: str, default: bool = False) -> bool:
 
 
 def run_cmd(cmd: list, check: bool = True, capture: bool = False,
-            env_extra: dict = None) -> subprocess.CompletedProcess:
+            env_extra: dict = None, cwd: str = None) -> subprocess.CompletedProcess:
     env = os.environ.copy()
     if env_extra:
         env.update(env_extra)
     kwargs = dict(check=check, env=env)
     if capture:
         kwargs.update(capture_output=True, text=True)
+    if cwd:
+        kwargs["cwd"] = cwd
     return subprocess.run(cmd, **kwargs)
 
 
@@ -424,18 +426,28 @@ def install_llamacpp_python(cpu_only: bool = False, flash_attn: bool = False) ->
 # 3. Download GGUF models
 # ---------------------------------------------------------------------------
 
+def _venv_py() -> str:
+    """Return the Python executable that has our packages installed."""
+    return str(VENV_PYTHON if (USE_VENV and VENV_PYTHON.is_file()) else Path(sys.executable))
+
+
+def _ensure_hf_hub() -> None:
+    """Install huggingface_hub into the correct Python environment if missing."""
+    py = _venv_py()
+    r = subprocess.run([py, "-c", "import huggingface_hub"],
+                       capture_output=True, check=False)
+    if r.returncode != 0:
+        info("huggingface_hub not found — installing ...")
+        subprocess.run([py, "-m", "pip", "install", "--upgrade",
+                        "huggingface_hub", "hf_transfer"], check=False)
+
+
 def download_gguf() -> None:
     banner("Gemma 4 — Download GGUF Models")
 
-    # Ensure huggingface_hub is available
-    try:
-        import huggingface_hub  # noqa: F401
-    except ImportError:
-        info("huggingface_hub not found — installing ...")
-        py = str(VENV_PYTHON if USE_VENV else Path(sys.executable))
-        subprocess.run([py, "-m", "pip", "install", "--upgrade",
-                        "huggingface_hub", "hf_transfer"], check=False)
-        import huggingface_hub  # noqa: F401
+    # Ensure huggingface_hub is available in the correct environment
+    _ensure_hf_hub()
+
 
     print()
     print("  VRAM guide: E2B≤6 GB  |  E4B≤10 GB  |  26B≤20 GB  |  31B≤22 GB (Q4)")
@@ -496,26 +508,26 @@ def download_gguf() -> None:
     target_dir.mkdir(parents=True, exist_ok=True)
 
     print()
-    # Enable hf_transfer for faster downloads if available
-    env = os.environ.copy()
-    env["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
+    py = _venv_py()
 
-    from huggingface_hub import hf_hub_download
     for label, repo_id, filename, size_gb, _, _ in choices:
         print(f"\n  Downloading: {filename}  ({size_gb} GB)")
         print(f"  Repo:        {repo_id}")
         repo_subdir = target_dir / repo_id.split("/")[-1]
         repo_subdir.mkdir(parents=True, exist_ok=True)
-        try:
-            path = hf_hub_download(
-                repo_id=repo_id,
-                filename=filename,
-                local_dir=str(repo_subdir),
-                local_dir_use_symlinks=False,
-            )
-            ok(f"Saved to: {path}")
-        except Exception as exc:
-            error(f"Download failed: {exc}")
+        env = os.environ.copy()
+        env["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
+        code = (
+            "from huggingface_hub import hf_hub_download; "
+            f"p = hf_hub_download(repo_id={repo_id!r}, filename={filename!r}, "
+            f"local_dir={str(repo_subdir)!r}, local_dir_use_symlinks=False); "
+            "print(p)"
+        )
+        r = subprocess.run([py, "-c", code], env=env, check=False)
+        if r.returncode == 0:
+            ok(f"Saved to: {repo_subdir / filename}")
+        else:
+            error(f"Download failed for {filename}")
             warn("If you see 401/403, run: huggingface-cli login")
 
     print(f"\n{SEP}")
