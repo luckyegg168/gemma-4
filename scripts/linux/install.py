@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
 install.py — Linux installer for Gemma 4 dependencies
-Linux-specific: checks system packages, RAM/disk, GPU, and HF token.
+Linux-specific: creates a virtualenv, checks system packages,
+RAM/disk, GPU, and HuggingFace token.
 
 Usage:
-    ./install.py            # interactive menu  (chmod +x first)
-    python3 install.py      # interactive menu
+    ./install.py                  # interactive menu  (chmod +x first)
+    python3 install.py            # interactive menu
     python3 install.py --base     # transformers baseline
     python3 install.py --llamacpp # llama-cpp-python (GPU CUDA)
     python3 install.py --vllm     # vllm (GPU server)
@@ -29,7 +30,8 @@ if platform.system() != "Linux":
     sys.exit(1)
 
 SEP = "=" * 60
-
+VENV_DIR = os.path.expanduser("~/gemma4-env")
+VENV_PYTHON = os.path.join(VENV_DIR, "bin", "python")
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -75,15 +77,29 @@ def run_capture(cmd: list) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, capture_output=True, text=True)
 
 
-def pip(*packages: str, extra_index: str = None, no_cache: bool = False,
+def setup_venv() -> str:
+    """Create virtualenv at ~/gemma4-env if it doesn't exist. Returns venv python path."""
+    if not os.path.isfile(VENV_PYTHON):
+        info(f"Creating virtual environment at {VENV_DIR} ...")
+        result = subprocess.run([sys.executable, "-m", "venv", VENV_DIR])
+        if result.returncode != 0:
+            error("Failed to create virtual environment.")
+            error("Try:  sudo apt install python3-venv python3-full")
+            sys.exit(1)
+        ok(f"Venv created: {VENV_DIR}")
+    else:
+        ok(f"Venv ready:   {VENV_DIR}")
+    return VENV_PYTHON
+
+
+def pip(*packages: str, python: str = None, extra_index: str = None,
         no_build_isolation: bool = False, no_binary: str = None,
         env_extra: dict = None) -> bool:
-    """Install pip packages. Returns True on success."""
-    cmd = [sys.executable, "-m", "pip", "install", "--upgrade"] + list(packages)
+    """Install pip packages into the venv. Returns True on success."""
+    py = python or VENV_PYTHON
+    cmd = [py, "-m", "pip", "install", "--upgrade"] + list(packages)
     if extra_index:
         cmd += ["--extra-index-url", extra_index]
-    if no_cache:
-        cmd.append("--no-cache-dir")
     if no_build_isolation:
         cmd.append("--no-build-isolation")
     if no_binary:
@@ -95,6 +111,18 @@ def pip(*packages: str, extra_index: str = None, no_cache: bool = False,
 
     result = subprocess.run(cmd, env=env)
     return result.returncode == 0
+
+
+def print_activate_hint() -> None:
+    print()
+    print("  -------------------------------------------------------")
+    print(f"  Activate your environment before running Gemma 4:")
+    print(f"    source {VENV_DIR}/bin/activate")
+    print()
+    print(f"  Or run scripts directly with the venv Python:")
+    print(f"    {VENV_PYTHON} your_script.py")
+    print("  -------------------------------------------------------")
+    print()
 
 
 # ---------------------------------------------------------------------------
@@ -160,48 +188,48 @@ def check_disk(path: str = None) -> None:
 
 def check_system_packages() -> None:
     """Check for build tools needed for source builds."""
-    needed = {
-        "gcc":            "build-essential",
-        "make":           "build-essential",
-        "cmake":          "cmake",
-        "python3-dev":    "python3-dev",
-    }
+    needed = {"gcc": "build-essential", "make": "build-essential", "cmake": "cmake"}
     missing_pkgs = []
     for binary, pkg in needed.items():
         if not shutil.which(binary):
             missing_pkgs.append(pkg)
 
-    # python3-dev can't be checked by binary — check header
-    py_inc = subprocess.run(
-        [sys.executable, "-c", "import sysconfig; print(sysconfig.get_path('include'))"],
-        capture_output=True, text=True
+    # Check python3-dev via header file
+    py_inc = run_capture(
+        [sys.executable, "-c", "import sysconfig; print(sysconfig.get_path('include'))"]
     ).stdout.strip()
     if py_inc and not os.path.isfile(os.path.join(py_inc, "Python.h")):
-        if "python3-dev" not in missing_pkgs:
-            missing_pkgs.append("python3-dev")
+        missing_pkgs.append("python3-dev")
+
+    # Check python3-venv
+    r = run_capture([sys.executable, "-m", "venv", "--help"])
+    if r.returncode != 0:
+        missing_pkgs.append("python3-venv python3-full")
 
     if missing_pkgs:
         deduped = list(dict.fromkeys(missing_pkgs))
-        warn(f"Missing build packages: {' '.join(deduped)}")
+        warn(f"Missing system packages: {' '.join(deduped)}")
         info(f"Install with:  sudo apt install -y {' '.join(deduped)}")
     else:
-        ok("Build tools present (gcc, make, cmake, python3-dev).")
+        ok("Build tools present (gcc, make, cmake, python3-dev, python3-venv).")
 
 
 def check_hf_login() -> bool:
     """Return True if huggingface-cli is logged in."""
-    cli = shutil.which("huggingface-cli")
-    if not cli:
-        r = run_capture([sys.executable, "-m", "huggingface_hub.commands.huggingface_cli",
-                         "whoami"])
-    else:
+    # Try venv cli first, then system
+    venv_cli = os.path.join(VENV_DIR, "bin", "huggingface-cli")
+    cli = venv_cli if os.path.isfile(venv_cli) else shutil.which("huggingface-cli")
+    if cli:
         r = run_capture([cli, "whoami"])
+    else:
+        r = run_capture([VENV_PYTHON, "-m",
+                         "huggingface_hub.commands.huggingface_cli", "whoami"])
     logged_in = r.returncode == 0 and r.stdout.strip() and "Not logged in" not in r.stdout
     if logged_in:
         ok(f"HuggingFace: logged in as {r.stdout.strip().splitlines()[0]}")
     else:
         warn("HuggingFace: not logged in.")
-        info("Run option [5] below, or:  huggingface-cli login")
+        info("Run option [5] to set your token.")
     return logged_in
 
 
@@ -222,17 +250,26 @@ def syscheck() -> None:
     print("\n--- Build tools ---")
     check_system_packages()
 
+    print("\n--- Virtual environment ---")
+    if os.path.isfile(VENV_PYTHON):
+        ok(f"Venv exists: {VENV_DIR}")
+    else:
+        warn(f"No venv found at {VENV_DIR}  (run an install option to create it)")
+
     print("\n--- HuggingFace ---")
     check_hf_login()
 
-    print("\n--- Installed packages ---")
-    for pkg in ("torch", "transformers", "llama_cpp", "vllm", "huggingface_hub"):
-        r = run_capture([sys.executable, "-c",
-                         f"import {pkg}; v=getattr({pkg},'__version__','?'); print(f'{pkg} {{v}}')"])
-        if r.returncode == 0:
-            ok(r.stdout.strip())
-        else:
-            info(f"{pkg}: not installed")
+    print("\n--- Installed packages (in venv) ---")
+    if os.path.isfile(VENV_PYTHON):
+        for pkg in ("torch", "transformers", "llama_cpp", "vllm", "huggingface_hub"):
+            r = run_capture([VENV_PYTHON, "-c",
+                             f"import {pkg}; v=getattr({pkg},'__version__','?'); print(f'{pkg} {{v}}')"])
+            if r.returncode == 0:
+                ok(r.stdout.strip())
+            else:
+                info(f"{pkg}: not installed in venv")
+    else:
+        info("Run an install option first to create the venv.")
 
     print()
 
@@ -258,26 +295,25 @@ def install_base() -> None:
     if not gpu:
         warn("No NVIDIA GPU — PyTorch will run on CPU.")
 
-    step(4, 7, "Upgrading pip")
+    step(4, 7, "Creating virtual environment")
+    setup_venv()
+
+    step(5, 7, "Upgrading pip in venv")
     if pip("pip"):
         ok("pip upgraded.")
     else:
         warn("pip upgrade failed — continuing.")
 
-    step(5, 7, "Installing core packages (transformers, torch, accelerate)")
+    step(6, 7, "Installing core packages (transformers, torch, accelerate)")
     if pip("transformers", "torch", "accelerate"):
         ok("Core packages installed.")
     else:
         error("Core package installation failed.")
         sys.exit(1)
 
-    step(6, 7, "Installing huggingface_hub + multimodal deps")
-    ok_hub = pip("huggingface_hub")
-    ok_mm  = pip("Pillow", "librosa", "soundfile")
-    if ok_hub and ok_mm:
-        ok("huggingface_hub + multimodal deps installed.")
-    else:
-        warn("Some packages failed — audio/image features may be limited.")
+    pip("huggingface_hub")
+    pip("Pillow", "librosa", "soundfile")
+    ok("huggingface_hub + multimodal deps installed.")
 
     step(7, 7, "Flash Attention (optional — CUDA + gcc required)")
     if ask("Install flash-attn? Takes several minutes to compile"):
@@ -294,7 +330,8 @@ def install_base() -> None:
     print("\n  Next steps:")
     print("  1. Accept Gemma 4 license: https://huggingface.co/google/gemma-4-E2B-it")
     print("  2. Run ./download-models.sh to fetch model weights")
-    print("  3. Run ./start.sh to launch interactive chat\n")
+    print("  3. Run ./start.sh to launch interactive chat")
+    print_activate_hint()
 
 
 def install_llamacpp() -> None:
@@ -304,7 +341,8 @@ def install_llamacpp() -> None:
     if not check_python():
         sys.exit(1)
 
-    step(2, 5, "Upgrading pip")
+    step(2, 5, "Creating virtual environment")
+    setup_venv()
     pip("pip")
     ok("pip ready.")
 
@@ -331,7 +369,7 @@ def install_llamacpp() -> None:
                 installed = True
             else:
                 info("Pre-built wheels failed. Building from source with CUDA...")
-                check_system_packages()  # remind user if build tools missing
+                check_system_packages()
                 if pip(pkg, no_binary="llama-cpp-python",
                        env_extra={"CMAKE_ARGS": "-DGGML_CUDA=on", "FORCE_CMAKE": "1"}):
                     ok("GPU source build successful.")
@@ -349,7 +387,7 @@ def install_llamacpp() -> None:
             sys.exit(1)
 
     step(5, 5, "Verifying installation")
-    r = run_capture([sys.executable, "-c",
+    r = run_capture([VENV_PYTHON, "-c",
                      "from llama_cpp import Llama; print('llama-cpp-python OK')"])
     if r.returncode == 0:
         ok(r.stdout.strip())
@@ -363,7 +401,8 @@ def install_llamacpp() -> None:
     print(f" llama-cpp-python installed!  GPU={gpu_found}")
     print(SEP)
     print("\n  Next step: run ./download-models.sh (options [5]-[15] for GGUF)")
-    print("             then ./start-llamacpp.sh\n")
+    print("             then ./start-llamacpp.sh")
+    print_activate_hint()
 
 
 def install_vllm() -> None:
@@ -383,7 +422,8 @@ def install_vllm() -> None:
     else:
         ok("GPU detected.")
 
-    step(3, 5, "Installing PyTorch with CUDA support")
+    step(3, 5, "Creating virtual environment + PyTorch CUDA")
+    setup_venv()
     pip("pip")
     if pip("torch", "torchvision", "torchaudio",
            extra_index="https://download.pytorch.org/whl/cu121"):
@@ -406,7 +446,7 @@ def install_vllm() -> None:
     ok("vllm and dependencies installed.")
 
     step(5, 5, "Verifying installation")
-    r = run_capture([sys.executable, "-c",
+    r = run_capture([VENV_PYTHON, "-c",
                      "import vllm; print(f'vllm {vllm.__version__} OK')"])
     if r.returncode == 0:
         ok(r.stdout.strip())
@@ -421,7 +461,8 @@ def install_vllm() -> None:
     print(" NOTE: vllm requires GPU for inference.")
     print(" Use --llamacpp for CPU/lower-VRAM fallback.")
     print(SEP)
-    print("\n  Start the server: ./start-vllm.sh\n")
+    print("\n  Start the server: ./start-vllm.sh")
+    print_activate_hint()
 
 
 def setup_hf_token() -> None:
@@ -433,7 +474,7 @@ def setup_hf_token() -> None:
     print("  3. Generate a token at: https://huggingface.co/settings/tokens")
     print()
     try:
-        token = input("  Paste your HuggingFace token (hidden input — just paste): ").strip()
+        token = input("  Paste your HuggingFace token: ").strip()
     except (EOFError, KeyboardInterrupt):
         print()
         return
@@ -441,11 +482,12 @@ def setup_hf_token() -> None:
         warn("No token entered.")
         return
 
-    cli = shutil.which("huggingface-cli")
+    venv_cli = os.path.join(VENV_DIR, "bin", "huggingface-cli")
+    cli = venv_cli if os.path.isfile(venv_cli) else shutil.which("huggingface-cli")
     if cli:
         r = subprocess.run([cli, "login", "--token", token])
     else:
-        r = subprocess.run([sys.executable, "-m",
+        r = subprocess.run([VENV_PYTHON, "-m",
                             "huggingface_hub.commands.huggingface_cli",
                             "login", "--token", token])
     if r.returncode == 0:
@@ -461,13 +503,12 @@ def setup_hf_token() -> None:
 def interactive_menu() -> None:
     banner("Gemma 4 — Linux Installer")
     print(f"  Python : {sys.version.split()[0]}")
-
-    # Quick GPU line
+    print(f"  Venv   : {VENV_DIR} ({'exists' if os.path.isfile(VENV_PYTHON) else 'will be created'})")
     gpu = detect_nvidia_gpu() if shutil.which("nvidia-smi") or shutil.which("nvcc") else False
     print(f"  GPU    : {'detected' if gpu else 'not detected (CPU mode)'}")
     print()
     print("  [1] System check                  (RAM, disk, GPU, packages)")
-    print("  [2] Install transformers baseline  (all-platform, CPU + GPU)")
+    print("  [2] Install transformers baseline  (CPU + GPU)")
     print("  [3] Install llama-cpp-python       (GPU CUDA primary, CPU fallback)")
     print("  [4] Install vllm                   (GPU only)")
     print("  [5] Set HuggingFace token")

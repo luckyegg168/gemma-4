@@ -2,6 +2,8 @@
 """
 install.py — Cross-platform installer for Gemma 4 dependencies
 Works on Windows, Linux, and macOS.
+On Linux/macOS a virtualenv is created at ~/gemma4-env to avoid
+PEP 668 "externally-managed-environment" errors.
 
 Usage:
     python3 install.py            # interactive menu
@@ -24,6 +26,12 @@ import argparse
 
 PLATFORM = platform.system()  # "Windows", "Linux", "Darwin"
 SEP = "=" * 60
+USE_VENV = PLATFORM in ("Linux", "Darwin")
+VENV_DIR = os.path.expanduser("~/gemma4-env")
+VENV_PYTHON = (
+    os.path.join(VENV_DIR, "Scripts", "python.exe") if PLATFORM == "Windows"
+    else os.path.join(VENV_DIR, "bin", "python")
+)
 
 
 def banner(title: str) -> None:
@@ -50,14 +58,17 @@ def error(msg: str) -> None:
 
 def ask(prompt: str, default: bool = False) -> bool:
     hint = "[y/N]" if not default else "[Y/n]"
-    answer = input(f"  {prompt} {hint}: ").strip().lower()
+    try:
+        answer = input(f"  {prompt} {hint}: ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return default
     if not answer:
         return default
     return answer in ("y", "yes")
 
 
 def run(cmd: list, check: bool = True, capture: bool = False) -> subprocess.CompletedProcess:
-    """Run a command, streaming output unless capture=True."""
     kwargs = dict(check=check)
     if capture:
         kwargs["capture_output"] = True
@@ -65,15 +76,32 @@ def run(cmd: list, check: bool = True, capture: bool = False) -> subprocess.Comp
     return subprocess.run(cmd, **kwargs)
 
 
-def pip(*packages: str, extra_index: str = None, no_cache: bool = False,
+def setup_venv() -> str:
+    """Create virtualenv at ~/gemma4-env if needed. Returns the python path to use."""
+    if not USE_VENV:
+        return sys.executable
+    if not os.path.isfile(VENV_PYTHON):
+        print(f"  [INFO] Creating virtual environment at {VENV_DIR} ...")
+        result = subprocess.run([sys.executable, "-m", "venv", VENV_DIR])
+        if result.returncode != 0:
+            error("Failed to create virtual environment.")
+            if PLATFORM == "Linux":
+                error("Try:  sudo apt install python3-venv python3-full")
+            sys.exit(1)
+        ok(f"Venv created: {VENV_DIR}")
+    else:
+        ok(f"Venv ready:   {VENV_DIR}")
+    return VENV_PYTHON
+
+
+def pip(*packages: str, python: str = None, extra_index: str = None,
         no_build_isolation: bool = False, no_binary: str = None,
         env_extra: dict = None) -> bool:
-    """Install pip packages. Returns True on success."""
-    cmd = [sys.executable, "-m", "pip", "install", "--upgrade"] + list(packages)
+    """Install pip packages. Uses venv python on Linux/macOS. Returns True on success."""
+    py = python or (VENV_PYTHON if USE_VENV else sys.executable)
+    cmd = [py, "-m", "pip", "install", "--upgrade"] + list(packages)
     if extra_index:
         cmd += ["--extra-index-url", extra_index]
-    if no_cache:
-        cmd.append("--no-cache-dir")
     if no_build_isolation:
         cmd.append("--no-build-isolation")
     if no_binary:
@@ -115,15 +143,28 @@ def detect_nvidia_gpu() -> bool:
     return False
 
 
+def print_activate_hint() -> None:
+    if not USE_VENV:
+        return
+    print()
+    print("  -------------------------------------------------------")
+    print(f"  Activate your environment before running Gemma 4:")
+    print(f"    source {VENV_DIR}/bin/activate")
+    print()
+    print(f"  Or call the venv Python directly:")
+    print(f"    {VENV_PYTHON} your_script.py")
+    print("  -------------------------------------------------------")
+    print()
+
+
 # ---------------------------------------------------------------------------
 # Install routines
 # ---------------------------------------------------------------------------
 
 def install_base() -> None:
-    """Install transformers baseline (all platforms)."""
+    """Install transformers baseline."""
     banner("Gemma 4 — Transformers Baseline Installer")
 
-    # Step 1: Python version
     step(1, 6, "Checking Python")
     ver = sys.version_info
     if ver < (3, 9):
@@ -131,36 +172,27 @@ def install_base() -> None:
         sys.exit(1)
     ok(f"Python {ver.major}.{ver.minor}.{ver.micro}")
 
-    # Step 2: pip
-    step(2, 6, "Upgrading pip")
+    step(2, 6, "Setting up environment")
+    setup_venv()
+
+    step(3, 6, "Upgrading pip")
     if pip("pip"):
         ok("pip upgraded.")
     else:
         warn("pip upgrade failed — continuing.")
 
-    # Step 3: core ML
-    step(3, 6, "Installing core packages (transformers, torch, accelerate)")
+    step(4, 6, "Installing core packages (transformers, torch, accelerate)")
     if pip("transformers", "torch", "accelerate"):
         ok("Core packages installed.")
     else:
         error("Core package installation failed.")
         sys.exit(1)
 
-    # Step 4: HuggingFace Hub
-    step(4, 6, "Installing huggingface_hub")
-    if pip("huggingface_hub"):
-        ok("huggingface_hub installed.")
-    else:
-        warn("huggingface_hub install failed.")
+    step(5, 6, "Installing huggingface_hub + multimodal deps")
+    pip("huggingface_hub")
+    pip("Pillow", "librosa", "soundfile")
+    ok("huggingface_hub + multimodal deps installed.")
 
-    # Step 5: multimodal
-    step(5, 6, "Installing multimodal deps (Pillow, librosa, soundfile)")
-    if pip("Pillow", "librosa", "soundfile"):
-        ok("Multimodal deps installed.")
-    else:
-        warn("Some multimodal deps failed — audio/image features may be limited.")
-
-    # Step 6: flash-attn (Linux + CUDA only, optional)
     step(6, 6, "Flash Attention (optional, Linux + CUDA only)")
     if PLATFORM == "Linux":
         if ask("Install flash-attn? Requires CUDA + gcc, takes a while"):
@@ -179,14 +211,14 @@ def install_base() -> None:
     print("\n  Next steps:")
     print("  1. Accept Gemma 4 license at https://huggingface.co/google/gemma-4-E2B-it")
     print("  2. Run scripts/linux/download-models.sh  (or .bat on Windows) to fetch weights")
-    print("  3. Run scripts/linux/start.sh  (or start.bat) to launch interactive chat\n")
+    print("  3. Run scripts/linux/start.sh  (or start.bat) to launch interactive chat")
+    print_activate_hint()
 
 
 def install_llamacpp() -> None:
     """Install llama-cpp-python with GPU auto-detection."""
     banner("Gemma 4 — llama-cpp-python Installer (GPU CUDA)")
 
-    # Step 1
     step(1, 5, "Checking Python")
     ver = sys.version_info
     if ver < (3, 9):
@@ -194,12 +226,11 @@ def install_llamacpp() -> None:
         sys.exit(1)
     ok(f"Python {ver.major}.{ver.minor}.{ver.micro}")
 
-    # Step 2
-    step(2, 5, "Upgrading pip")
+    step(2, 5, "Setting up environment")
+    setup_venv()
     pip("pip")
     ok("pip ready.")
 
-    # Step 3
     step(3, 5, "Detecting NVIDIA GPU")
     gpu_found = detect_nvidia_gpu()
     if gpu_found:
@@ -207,7 +238,6 @@ def install_llamacpp() -> None:
     else:
         warn("No NVIDIA GPU detected — will install CPU-only llama-cpp-python.")
 
-    # Step 4
     step(4, 5, "Installing llama-cpp-python")
     pkg = "llama-cpp-python[server]>=0.3.0"
     installed = False
@@ -236,15 +266,14 @@ def install_llamacpp() -> None:
         print("  [INFO] Installing CPU-only llama-cpp-python...")
         if pip(pkg):
             ok("CPU-only llama-cpp-python installed.")
-            installed = True
         else:
             error("llama-cpp-python installation failed.")
             sys.exit(1)
 
-    # Step 5: verify
     step(5, 5, "Verifying installation")
+    py = VENV_PYTHON if USE_VENV else sys.executable
     r = subprocess.run(
-        [sys.executable, "-c", "from llama_cpp import Llama; print('llama-cpp-python OK')"],
+        [py, "-c", "from llama_cpp import Llama; print('llama-cpp-python OK')"],
         capture_output=True, text=True
     )
     if r.returncode == 0:
@@ -259,7 +288,8 @@ def install_llamacpp() -> None:
     print(f" llama-cpp-python installation complete!  GPU={gpu_found}")
     print(SEP)
     print("\n  Next step: download GGUF files (options [5]-[15] in download-models script)")
-    print("             then run start-llamacpp.sh / start-llamacpp.bat\n")
+    print("             then run start-llamacpp.sh / start-llamacpp.bat")
+    print_activate_hint()
 
 
 def install_vllm() -> None:
@@ -271,7 +301,6 @@ def install_vllm() -> None:
         error("vllm does not support Windows. Use WSL2 with an NVIDIA GPU instead.")
         sys.exit(1)
 
-    # Step 1
     step(1, 5, "Checking Python")
     ver = sys.version_info
     if ver < (3, 9):
@@ -279,7 +308,6 @@ def install_vllm() -> None:
         sys.exit(1)
     ok(f"Python {ver.major}.{ver.minor}.{ver.micro}")
 
-    # Step 2
     step(2, 5, "Checking NVIDIA GPU")
     if not detect_nvidia_gpu():
         warn("No NVIDIA GPU detected. vllm requires a GPU for inference.")
@@ -289,8 +317,8 @@ def install_vllm() -> None:
     else:
         ok("GPU detected.")
 
-    # Step 3
-    step(3, 5, "Installing PyTorch with CUDA support")
+    step(3, 5, "Setting up environment + PyTorch CUDA")
+    setup_venv()
     pip("pip")
     if pip("torch", "torchvision", "torchaudio",
            extra_index="https://download.pytorch.org/whl/cu121"):
@@ -304,7 +332,6 @@ def install_vllm() -> None:
             error("PyTorch CUDA installation failed.")
             sys.exit(1)
 
-    # Step 4
     step(4, 5, "Installing vllm and dependencies")
     if not pip("vllm"):
         error("vllm installation failed. Ensure CUDA drivers are installed.")
@@ -313,11 +340,10 @@ def install_vllm() -> None:
     pip("huggingface_hub>=0.22.0", "transformers>=4.47.0", "accelerate")
     ok("vllm and dependencies installed.")
 
-    # Step 5
     step(5, 5, "Verifying installation")
+    py = VENV_PYTHON if USE_VENV else sys.executable
     r = subprocess.run(
-        [sys.executable, "-c",
-         "import vllm; print(f'vllm {vllm.__version__} OK')"],
+        [py, "-c", "import vllm; print(f'vllm {vllm.__version__} OK')"],
         capture_output=True, text=True
     )
     if r.returncode == 0:
@@ -333,7 +359,8 @@ def install_vllm() -> None:
     print(" NOTE: vllm requires GPU for inference.")
     print(" Use llama.cpp (--llamacpp) for CPU/lower-VRAM fallback.")
     print(SEP)
-    print("\n  Start the vllm server: scripts/linux/start-vllm.sh\n")
+    print("\n  Start the vllm server: scripts/linux/start-vllm.sh")
+    print_activate_hint()
 
 
 # ---------------------------------------------------------------------------
@@ -344,6 +371,9 @@ def interactive_menu() -> None:
     banner("Gemma 4 — Dependency Installer")
     print(f"  Platform : {PLATFORM}")
     print(f"  Python   : {sys.version.split()[0]}")
+    if USE_VENV:
+        status = "exists" if os.path.isfile(VENV_PYTHON) else "will be created"
+        print(f"  Venv     : {VENV_DIR} ({status})")
     print()
     print("  [1] Transformers baseline  (all platforms, CPU + GPU)")
     print("  [2] llama-cpp-python       (GPU CUDA primary, CPU fallback)")
@@ -351,7 +381,11 @@ def interactive_menu() -> None:
     print("  [4] All of the above")
     print("  [0] Exit")
     print()
-    choice = input("  Choice: ").strip()
+    try:
+        choice = input("  Choice: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        sys.exit(0)
 
     if choice == "1":
         install_base()
