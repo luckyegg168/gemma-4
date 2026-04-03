@@ -57,7 +57,7 @@ echo ""
 echo "[Step 4/5] Installing vllm and dependencies..."
 $PYTHON -m pip install vllm
 $PYTHON -m pip install openai
-$PYTHON -m pip install "huggingface_hub>=0.22.0" "transformers>=4.47.0" accelerate
+$PYTHON -m pip install "huggingface_hub>=0.22.0" "transformers>=4.56.0,<5.0.0" accelerate
 echo "[OK] vllm and dependencies installed."
 
 # --- Step 5: Verify ---

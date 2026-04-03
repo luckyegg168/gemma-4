@@ -442,7 +442,7 @@ def install_vllm() -> None:
         error("vllm installation failed. Ensure CUDA drivers are installed.")
         sys.exit(1)
     pip("openai")
-    pip("huggingface_hub>=0.22.0", "transformers>=4.47.0", "accelerate")
+    pip("huggingface_hub>=0.22.0", "transformers>=4.56.0,<5.0.0", "accelerate")
     ok("vllm and dependencies installed.")
 
     step(5, 5, "Verifying installation")
