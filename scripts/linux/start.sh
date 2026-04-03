@@ -6,12 +6,20 @@ echo " Gemma 4 - Interactive Chat"
 echo "============================================================"
 echo ""
 
+# --- Select Python (prefer venv) ---
+VENV_DIR="$HOME/gemma4-env"
+if [ -f "$VENV_DIR/bin/python" ]; then
+    PYTHON="$VENV_DIR/bin/python"
+else
+    PYTHON=$(command -v python3 || command -v python || true)
+fi
+
 # --- Check prerequisites ---
-if ! command -v python3 &>/dev/null; then
-    echo "[ERROR] Python 3 not found. Run install-dep.sh first."
+if [ -z "$PYTHON" ]; then
+    echo "[ERROR] Python 3 not found. Run install-python3.sh first."
     exit 1
 fi
-python3 -c "import transformers" 2>/dev/null
+$PYTHON -c "import transformers" 2>/dev/null
 if [ $? -ne 0 ]; then
     echo "[ERROR] transformers not installed. Run install-dep.sh first."
     exit 1
@@ -194,7 +202,7 @@ while True:
     history.append({"role": "model", "content": clean_for_history(response)})
 PYEOF
 
-python3 "$TEMP_SCRIPT"
+$PYTHON "$TEMP_SCRIPT"
 EXIT_CODE=$?
 rm -f "$TEMP_SCRIPT"
 

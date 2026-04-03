@@ -6,7 +6,12 @@
 # =============================================================
 set -euo pipefail
 
-PYTHON=$(command -v python3 || command -v python)
+VENV_DIR="$HOME/gemma4-env"
+if [ -f "$VENV_DIR/bin/python" ]; then
+    PYTHON="$VENV_DIR/bin/python"
+else
+    PYTHON=$(command -v python3 || command -v python || true)
+fi
 
 echo "============================================================"
 echo " Gemma 4 - vllm Server & Client"

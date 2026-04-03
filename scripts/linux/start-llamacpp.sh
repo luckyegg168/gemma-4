@@ -11,8 +11,15 @@ echo " GPU-accelerated GGUF inference with n_gpu_layers offloading"
 echo "============================================================"
 echo ""
 
+# --- Select Python (prefer venv) ---
+VENV_DIR="$HOME/gemma4-env"
+if [ -f "$VENV_DIR/bin/python" ]; then
+    PYTHON="$VENV_DIR/bin/python"
+else
+    PYTHON=$(command -v python3 || command -v python || true)
+fi
+
 # --- Check llama_cpp ---
-PYTHON=$(command -v python3 || command -v python)
 if ! $PYTHON -c "from llama_cpp import Llama" &>/dev/null; then
     echo "[ERROR] llama-cpp-python is not installed."
     echo "        Run install-dep-llamacpp.sh first."

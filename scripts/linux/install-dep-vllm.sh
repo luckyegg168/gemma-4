@@ -12,13 +12,19 @@ echo " NOTE: vllm requires an NVIDIA GPU (CUDA 11.8+)"
 echo "============================================================"
 echo ""
 
-# --- Step 1: Check Python ---
+# --- Step 1: Check Python + setup venv ---
 echo "[Step 1/5] Checking Python..."
 if ! command -v python3 &>/dev/null && ! command -v python &>/dev/null; then
     echo "[ERROR] Python not found. Install Python 3.9+ first."
     exit 1
 fi
-PYTHON=$(command -v python3 || command -v python)
+VENV_DIR="$HOME/gemma4-env"
+if [ ! -f "$VENV_DIR/bin/python" ]; then
+    echo "[INFO] Creating virtual environment at $VENV_DIR ..."
+    python3 -m venv "$VENV_DIR" || { echo "[ERROR] venv failed. Try: sudo apt install python3-venv"; exit 1; }
+    echo "[OK] Venv created."
+fi
+PYTHON="$VENV_DIR/bin/python"
 $PYTHON --version
 
 # --- Step 2: Check NVIDIA GPU ---
