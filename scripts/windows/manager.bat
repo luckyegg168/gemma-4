@@ -8,27 +8,42 @@ echo  Gemma 4 - Model Manager
 echo  Complete management interface for Gemma 4 models
 echo ============================================================
 echo.
-echo  [1] Install Dependencies
-echo  [2] Download Models
-echo  [3] Start Interactive Chat
-echo  [4] Run Benchmark / Quick Test
-echo  [5] Show Model Information
-echo  [6] Show System Information
-echo  [7] Set HuggingFace Token
-echo  [8] List Downloaded Models
-echo  [9] Exit
+echo  --- Setup ---
+echo  [1]  Install Dependencies (transformers baseline)
+echo  [2]  Install llama.cpp Dependencies (GPU GGUF inference)
+echo  [3]  Install vllm Dependencies     (GPU API server)
 echo.
-set /p MAIN_CHOICE="Enter choice [1-9]: "
+echo  --- Models ---
+echo  [4]  Download Models
+echo.
+echo  --- Inference ---
+echo  [5]  Start Chat (transformers)
+echo  [6]  Start Chat (llama.cpp / GGUF)
+echo  [7]  Start vllm Server (OpenAI-compatible API)
+echo.
+echo  --- Tools ---
+echo  [8]  Run Benchmark / Quick Test
+echo  [9]  Show Model Information
+echo  [10] Show System Information
+echo  [11] Set HuggingFace Token
+echo  [12] List Downloaded Models
+echo  [0]  Exit
+echo.
+set /p MAIN_CHOICE="Enter choice [0-12]: "
 
-if "%MAIN_CHOICE%"=="1" goto :RUN_INSTALL
-if "%MAIN_CHOICE%"=="2" goto :RUN_DOWNLOAD
-if "%MAIN_CHOICE%"=="3" goto :RUN_CHAT
-if "%MAIN_CHOICE%"=="4" goto :RUN_BENCHMARK
-if "%MAIN_CHOICE%"=="5" goto :SHOW_MODEL_INFO
-if "%MAIN_CHOICE%"=="6" goto :SHOW_SYSTEM_INFO
-if "%MAIN_CHOICE%"=="7" goto :SET_TOKEN
-if "%MAIN_CHOICE%"=="8" goto :LIST_MODELS
-if "%MAIN_CHOICE%"=="9" exit /b 0
+if "%MAIN_CHOICE%"=="0"  exit /b 0
+if "%MAIN_CHOICE%"=="1"  goto :RUN_INSTALL
+if "%MAIN_CHOICE%"=="2"  goto :RUN_INSTALL_LLAMACPP
+if "%MAIN_CHOICE%"=="3"  goto :RUN_INSTALL_VLLM
+if "%MAIN_CHOICE%"=="4"  goto :RUN_DOWNLOAD
+if "%MAIN_CHOICE%"=="5"  goto :RUN_CHAT
+if "%MAIN_CHOICE%"=="6"  goto :RUN_CHAT_LLAMACPP
+if "%MAIN_CHOICE%"=="7"  goto :RUN_VLLM_SERVER
+if "%MAIN_CHOICE%"=="8"  goto :RUN_BENCHMARK
+if "%MAIN_CHOICE%"=="9"  goto :SHOW_MODEL_INFO
+if "%MAIN_CHOICE%"=="10" goto :SHOW_SYSTEM_INFO
+if "%MAIN_CHOICE%"=="11" goto :SET_TOKEN
+if "%MAIN_CHOICE%"=="12" goto :LIST_MODELS
 echo [ERROR] Invalid choice. Press any key to try again.
 pause >nul
 goto :MAIN_MENU
@@ -36,8 +51,22 @@ goto :MAIN_MENU
 REM ============================================================
 :RUN_INSTALL
 cls
-echo [INFO] Launching dependency installer...
+echo [INFO] Launching dependency installer (transformers)...
 call "%~dp0install-dep.bat"
+goto :MAIN_MENU
+
+REM ============================================================
+:RUN_INSTALL_LLAMACPP
+cls
+echo [INFO] Launching llama.cpp dependency installer (GPU GGUF)...
+call "%~dp0install-dep-llamacpp.bat"
+goto :MAIN_MENU
+
+REM ============================================================
+:RUN_INSTALL_VLLM
+cls
+echo [INFO] Launching vllm dependency installer (GPU API server)...
+call "%~dp0install-dep-vllm.bat"
 goto :MAIN_MENU
 
 REM ============================================================
@@ -50,8 +79,22 @@ goto :MAIN_MENU
 REM ============================================================
 :RUN_CHAT
 cls
-echo [INFO] Launching interactive chat...
+echo [INFO] Launching interactive chat (transformers)...
 call "%~dp0start.bat"
+goto :MAIN_MENU
+
+REM ============================================================
+:RUN_CHAT_LLAMACPP
+cls
+echo [INFO] Launching llama.cpp GGUF chat...
+call "%~dp0start-llamacpp.bat"
+goto :MAIN_MENU
+
+REM ============================================================
+:RUN_VLLM_SERVER
+cls
+echo [INFO] Launching vllm OpenAI-compatible server...
+call "%~dp0start-vllm.bat"
 goto :MAIN_MENU
 
 REM ============================================================
@@ -151,11 +194,30 @@ echo  E4B (Dense+PLE)    google/gemma-4-E4B-it           4.5B eff 128K     Yes  
 echo  26B-A4B (MoE)      google/gemma-4-26B-A4B-it       3.8B act 256K     No     32 GB
 echo  31B (Dense)        google/gemma-4-31B-it           30.7B    256K     No     48 GB+
 echo.
-echo  GGUF (26B-A4B)     unsloth/gemma-4-26B-A4B-it-GGUF
-echo    IQ4_XS            13.4 GB   - Minimum quality, lowest VRAM
-echo    Q4_K_M            16.9 GB   - Recommended balance
-echo    Q8_0              26.9 GB   - Near full quality
-echo    BF16              50.5 GB   - Full precision
+echo  GGUF (llama.cpp) - Recommended quantizations:
+echo.
+echo  E2B GGUF       unsloth/gemma-4-E2B-it-GGUF
+echo    Q4_K_M         3.11 GB  *Recommended*
+echo    Q8_0           5.05 GB  High quality
+echo    BF16           9.31 GB  Full precision
+echo.
+echo  E4B GGUF       unsloth/gemma-4-E4B-it-GGUF
+echo    Q4_K_M         4.98 GB  *Recommended*
+echo    Q8_0           8.19 GB  High quality
+echo    BF16          15.1 GB   Full precision
+echo.
+echo  26B-A4B GGUF   unsloth/gemma-4-26B-A4B-it-GGUF   (MoE - most efficient!)
+echo    IQ4_XS        13.4 GB  Low VRAM option
+echo    MXFP4_MOE     16.7 GB  *MoE-optimized, unique to 26B-A4B*
+echo    UD-Q4_K_M     16.9 GB  *Recommended*
+echo    Q8_0          26.9 GB  Near full quality
+echo    BF16          50.5 GB  Full precision
+echo.
+echo  31B GGUF       unsloth/gemma-4-31B-it-GGUF   (most downloads: 84K/mo!)
+echo    IQ4_XS        16.4 GB  Smallest option
+echo    Q4_K_M        18.3 GB  *Recommended*
+echo    Q8_0          32.6 GB  Near full quality
+echo    BF16          61.4 GB  Full precision
 echo.
 echo  Architecture Key:
 echo    PLE = Per-Layer Embeddings (on-device efficiency)
@@ -167,8 +229,14 @@ echo  Best for:
 echo    Voice/Audio input    E2B or E4B (only models with audio encoder)
 echo    Coding/Reasoning     31B ^> 26B-A4B ^> E4B
 echo    On-device / Mobile   E2B
-echo    Fast large model     26B-A4B (near 4B speed)
+echo    Fast large model     26B-A4B (near 4B speed due to MoE)
 echo    Highest quality      31B
+echo    GGUF recommended     31B Q4_K_M (best performance/quality)
+echo.
+echo  Inference backends:
+echo    transformers  Full-precision HF weights. CPU or GPU. Audio supported.
+echo    llama.cpp     GGUF quantized. GPU-accelerated (n_gpu_layers=-1). CPU fallback.
+echo    vllm          Full-precision only. GPU REQUIRED. OpenAI API compatible.
 echo.
 echo  Recommended sampling:  temperature=1.0, top_p=0.95, top_k=64
 echo  Document/OCR tasks:    Use image token budget 1120

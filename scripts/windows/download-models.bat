@@ -28,29 +28,46 @@ echo.
 REM --- Model selection menu ---
 echo  Select a model to download:
 echo.
-echo  [1] E2B  (google/gemma-4-E2B-it)     ~5 GB   On-device, Text+Image+Audio, 128K ctx
-echo  [2] E4B  (google/gemma-4-E4B-it)     ~8 GB   On-device, Text+Image+Audio, 128K ctx
-echo  [3] 26B-A4B (google/gemma-4-26B-A4B-it) ~50 GB  MoE, Text+Image, 256K ctx
-echo  [4] 31B  (google/gemma-4-31B-it)     ~65 GB  Dense, Text+Image, 256K ctx
-echo  [5] 26B-A4B GGUF Q4_K_M (recommended) ~17 GB  Quantized, llama.cpp compatible
-echo  [6] 26B-A4B GGUF IQ4_XS (smaller)   ~13.4 GB Quantized, low VRAM
-echo  [7] 26B-A4B GGUF Q8_0   (quality)   ~26.9 GB Quantized, near full quality
-echo  [8] Download ALL GGUF quantizations  (requires 200+ GB)
-echo  [9] Custom model ID
-echo  [0] Exit
+echo  --- Full-precision (transformers ^& vllm) ---
+echo  [1]  E2B     google/gemma-4-E2B-it        ~5 GB   Text+Image+Audio, 128K ctx
+echo  [2]  E4B     google/gemma-4-E4B-it        ~8 GB   Text+Image+Audio, 128K ctx
+echo  [3]  26B-A4B google/gemma-4-26B-A4B-it   ~50 GB  MoE, Text+Image, 256K ctx
+echo  [4]  31B     google/gemma-4-31B-it        ~65 GB  Dense, Text+Image, 256K ctx
 echo.
-set /p CHOICE="Enter your choice [1-9, 0 to exit]: "
+echo  --- GGUF quantized (llama.cpp) ---
+echo  [5]  E2B     GGUF Q4_K_M   3.11 GB  (unsloth/gemma-4-E2B-it-GGUF)     Recommended
+echo  [6]  E2B     GGUF Q8_0     5.05 GB
+echo  [7]  E4B     GGUF Q4_K_M   4.98 GB  (unsloth/gemma-4-E4B-it-GGUF)     Recommended
+echo  [8]  E4B     GGUF Q8_0     8.19 GB
+echo  [9]  26B-A4B GGUF MXFP4_MOE  16.7 GB  (unsloth/gemma-4-26B-A4B-it-GGUF) MoE-optimized
+echo  [10] 26B-A4B GGUF UD-Q4_K_M  16.9 GB  Recommended
+echo  [11] 26B-A4B GGUF IQ4_XS     13.4 GB  Low VRAM option
+echo  [12] 26B-A4B GGUF Q8_0       26.9 GB  Near full quality
+echo  [13] 31B     GGUF Q4_K_M   18.3 GB  (unsloth/gemma-4-31B-it-GGUF)     Recommended
+echo  [14] 31B     GGUF IQ4_XS   16.4 GB  Smallest 31B option
+echo  [15] 31B     GGUF Q8_0     32.6 GB  Near full quality
+echo  [16] Custom model ID
+echo  [0]  Exit
+echo.
+set /p CHOICE="Enter your choice [0-16]: "
 
-if "%CHOICE%"=="0" goto :eof
-if "%CHOICE%"=="1" goto :download_e2b
-if "%CHOICE%"=="2" goto :download_e4b
-if "%CHOICE%"=="3" goto :download_26b
-if "%CHOICE%"=="4" goto :download_31b
-if "%CHOICE%"=="5" goto :download_gguf_q4km
-if "%CHOICE%"=="6" goto :download_gguf_iq4xs
-if "%CHOICE%"=="7" goto :download_gguf_q8
-if "%CHOICE%"=="8" goto :download_gguf_all
-if "%CHOICE%"=="9" goto :download_custom
+if "%CHOICE%"=="0"  goto :eof
+if "%CHOICE%"=="1"  goto :download_e2b
+if "%CHOICE%"=="2"  goto :download_e4b
+if "%CHOICE%"=="3"  goto :download_26b
+if "%CHOICE%"=="4"  goto :download_31b
+if "%CHOICE%"=="5"  goto :download_e2b_q4km
+if "%CHOICE%"=="6"  goto :download_e2b_q8
+if "%CHOICE%"=="7"  goto :download_e4b_q4km
+if "%CHOICE%"=="8"  goto :download_e4b_q8
+if "%CHOICE%"=="9"  goto :download_26b_mxfp4
+if "%CHOICE%"=="10" goto :download_26b_q4km
+if "%CHOICE%"=="11" goto :download_26b_iq4xs
+if "%CHOICE%"=="12" goto :download_26b_q8
+if "%CHOICE%"=="13" goto :download_31b_q4km
+if "%CHOICE%"=="14" goto :download_31b_iq4xs
+if "%CHOICE%"=="15" goto :download_31b_q8
+if "%CHOICE%"=="16" goto :download_custom
 echo [ERROR] Invalid choice.
 pause
 exit /b 1
@@ -75,32 +92,71 @@ set "MODEL_ID=google/gemma-4-31B-it"
 set "LOCAL_DIR=%MODELS_DIR%\gemma-4-31B-it"
 goto :do_download
 
-:download_gguf_q4km
-set "MODEL_ID=unsloth/gemma-4-26B-A4B-it-GGUF"
-set "LOCAL_DIR=%MODELS_DIR%\gemma-4-26B-A4B-it-GGUF"
+:download_e2b_q4km
+set "MODEL_ID=unsloth/gemma-4-E2B-it-GGUF"
+set "LOCAL_DIR=%MODELS_DIR%\gemma-4-E2B-it-GGUF"
 set "INCLUDE_FILTER=*Q4_K_M*"
 goto :do_gguf_download
 
-:download_gguf_iq4xs
+:download_e2b_q8
+set "MODEL_ID=unsloth/gemma-4-E2B-it-GGUF"
+set "LOCAL_DIR=%MODELS_DIR%\gemma-4-E2B-it-GGUF"
+set "INCLUDE_FILTER=*Q8_0*"
+goto :do_gguf_download
+
+:download_e4b_q4km
+set "MODEL_ID=unsloth/gemma-4-E4B-it-GGUF"
+set "LOCAL_DIR=%MODELS_DIR%\gemma-4-E4B-it-GGUF"
+set "INCLUDE_FILTER=*Q4_K_M*"
+goto :do_gguf_download
+
+:download_e4b_q8
+set "MODEL_ID=unsloth/gemma-4-E4B-it-GGUF"
+set "LOCAL_DIR=%MODELS_DIR%\gemma-4-E4B-it-GGUF"
+set "INCLUDE_FILTER=*Q8_0*"
+goto :do_gguf_download
+
+:download_26b_mxfp4
+set "MODEL_ID=unsloth/gemma-4-26B-A4B-it-GGUF"
+set "LOCAL_DIR=%MODELS_DIR%\gemma-4-26B-A4B-it-GGUF"
+set "INCLUDE_FILTER=*MXFP4_MOE*"
+goto :do_gguf_download
+
+:download_26b_q4km
+set "MODEL_ID=unsloth/gemma-4-26B-A4B-it-GGUF"
+set "LOCAL_DIR=%MODELS_DIR%\gemma-4-26B-A4B-it-GGUF"
+set "INCLUDE_FILTER=*UD-Q4_K_M*"
+goto :do_gguf_download
+
+:download_26b_iq4xs
 set "MODEL_ID=unsloth/gemma-4-26B-A4B-it-GGUF"
 set "LOCAL_DIR=%MODELS_DIR%\gemma-4-26B-A4B-it-GGUF"
 set "INCLUDE_FILTER=*IQ4_XS*"
 goto :do_gguf_download
 
-:download_gguf_q8
+:download_26b_q8
 set "MODEL_ID=unsloth/gemma-4-26B-A4B-it-GGUF"
 set "LOCAL_DIR=%MODELS_DIR%\gemma-4-26B-A4B-it-GGUF"
 set "INCLUDE_FILTER=*Q8_0*"
 goto :do_gguf_download
 
-:download_gguf_all
-set "MODEL_ID=unsloth/gemma-4-26B-A4B-it-GGUF"
-set "LOCAL_DIR=%MODELS_DIR%\gemma-4-26B-A4B-it-GGUF"
-echo.
-echo [INFO] Downloading ALL GGUF quantizations. This requires 200+ GB of disk space.
-set /p CONFIRM="Are you sure? [y/N]: "
-if /i not "%CONFIRM%"=="y" goto :eof
-goto :do_download
+:download_31b_q4km
+set "MODEL_ID=unsloth/gemma-4-31B-it-GGUF"
+set "LOCAL_DIR=%MODELS_DIR%\gemma-4-31B-it-GGUF"
+set "INCLUDE_FILTER=*Q4_K_M*"
+goto :do_gguf_download
+
+:download_31b_iq4xs
+set "MODEL_ID=unsloth/gemma-4-31B-it-GGUF"
+set "LOCAL_DIR=%MODELS_DIR%\gemma-4-31B-it-GGUF"
+set "INCLUDE_FILTER=*IQ4_XS*"
+goto :do_gguf_download
+
+:download_31b_q8
+set "MODEL_ID=unsloth/gemma-4-31B-it-GGUF"
+set "LOCAL_DIR=%MODELS_DIR%\gemma-4-31B-it-GGUF"
+set "INCLUDE_FILTER=*Q8_0*"
+goto :do_gguf_download
 
 :download_custom
 set /p MODEL_ID="Enter HuggingFace model ID (e.g. google/gemma-4-E2B-it): "

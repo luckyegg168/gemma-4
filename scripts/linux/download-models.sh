@@ -55,16 +55,23 @@ echo "  [2] E4B   - google/gemma-4-E4B-it    (~8B,   multimodal text+image+audio
 echo "  [3] 26B-A4B - google/gemma-4-26B-A4B-it  (MoE, text+image)"
 echo "  [4] 31B   - google/gemma-4-31B-it    (~30.7B, text+image)"
 echo ""
-echo "  --- GGUF quantized (unsloth, llama-cpp-python) ---"
-echo "  [5] 26B-A4B Q4_K_M  (16.9 GB, recommended)"
-echo "  [6] 26B-A4B IQ4_XS  (13.4 GB, minimum VRAM)"
-echo "  [7] 26B-A4B Q8_0    (26.9 GB, near-full quality)"
-echo "  [8] All GGUF variants (full collection)"
+  --- GGUF quantized (unsloth, llama-cpp-python) ---"
+echo "  [5]  E2B   Q4_K_M   3.11 GB  Recommended"
+echo "  [6]  E2B   Q8_0     5.05 GB  High quality"
+echo "  [7]  E4B   Q4_K_M   4.98 GB  Recommended"
+echo "  [8]  E4B   Q8_0     8.19 GB  High quality"
+echo "  [9]  26B-A4B MXFP4_MOE  16.7 GB  MoE-optimized (unique)"
+echo "  [10] 26B-A4B UD-Q4_K_M  16.9 GB  Recommended"
+echo "  [11] 26B-A4B IQ4_XS     13.4 GB  Smallest 26B"
+echo "  [12] 26B-A4B Q8_0       26.9 GB  Near full quality"
+echo "  [13] 31B  Q4_K_M   18.3 GB  Recommended (most downloaded)"
+echo "  [14] 31B  IQ4_XS   16.4 GB  Smallest 31B"
+echo "  [15] 31B  Q8_0     32.6 GB  Near full quality"
 echo ""
-echo "  [9] Custom HuggingFace model ID"
+echo "  [16] Custom HuggingFace model ID"
 echo "  [0] Back"
 echo ""
-read -p "Enter choice [0-9]: " DL_CHOICE
+read -p "Enter choice [0-16]: " DL_CHOICE
 
 do_download() {
     local MODEL_ID="$1"
@@ -101,24 +108,42 @@ do_gguf_download() {
     fi
 }
 
+do_gguf_model_download() {
+    local PATTERN="$1"
+    local REPO="$2"
+    local DESC="$3"
+    local DEST="$DEST_DIR/$REPO"
+    echo ""
+    echo "[INFO] Downloading GGUF: $DESC"
+    echo "[INFO] Repo: $REPO"
+    echo "[INFO] Destination: $DEST"
+    mkdir -p "$DEST"
+    huggingface-cli download "unsloth/$REPO" --include "$PATTERN" --local-dir "$DEST"
+    if [ $? -eq 0 ]; then
+        echo "[OK] GGUF download complete."
+    else
+        echo "[ERROR] GGUF download failed."
+    fi
+}
+
 case "$DL_CHOICE" in
     0) exit 0 ;;
-    1) do_download "google/gemma-4-E2B-it" "$DEST_DIR/gemma-4-E2B-it" ;;
-    2) do_download "google/gemma-4-E4B-it" "$DEST_DIR/gemma-4-E4B-it" ;;
-    3) do_download "google/gemma-4-26B-A4B-it" "$DEST_DIR/gemma-4-26B-A4B-it" ;;
-    4) do_download "google/gemma-4-31B-it" "$DEST_DIR/gemma-4-31B-it" ;;
-    5) do_gguf_download "*Q4_K_M*" "26B-A4B Q4_K_M (16.9 GB, recommended)" ;;
-    6) do_gguf_download "*IQ4_XS*" "26B-A4B IQ4_XS (13.4 GB, minimum VRAM)" ;;
-    7) do_gguf_download "*Q8_0*"   "26B-A4B Q8_0 (26.9 GB, near-full quality)" ;;
-    8)
-        echo ""
-        echo "[INFO] Downloading ALL GGUF variants (warning: large download)..."
-        DEST_ALL="$DEST_DIR/gemma-4-26B-A4B-GGUF-all"
-        mkdir -p "$DEST_ALL"
-        huggingface-cli download "unsloth/gemma-4-26B-A4B-it-GGUF" --local-dir "$DEST_ALL"
-        [ $? -eq 0 ] && echo "[OK] All GGUF downloaded." || echo "[ERROR] GGUF download failed."
-        ;;
-    9)
+    1)  do_download "google/gemma-4-E2B-it" "$DEST_DIR/gemma-4-E2B-it" ;;
+    2)  do_download "google/gemma-4-E4B-it" "$DEST_DIR/gemma-4-E4B-it" ;;
+    3)  do_download "google/gemma-4-26B-A4B-it" "$DEST_DIR/gemma-4-26B-A4B-it" ;;
+    4)  do_download "google/gemma-4-31B-it" "$DEST_DIR/gemma-4-31B-it" ;;
+    5)  do_gguf_model_download "*Q4_K_M*" "gemma-4-E2B-it-GGUF" "E2B Q4_K_M (3.11 GB)" ;;
+    6)  do_gguf_model_download "*Q8_0*"   "gemma-4-E2B-it-GGUF" "E2B Q8_0 (5.05 GB)" ;;
+    7)  do_gguf_model_download "*Q4_K_M*" "gemma-4-E4B-it-GGUF" "E4B Q4_K_M (4.98 GB)" ;;
+    8)  do_gguf_model_download "*Q8_0*"   "gemma-4-E4B-it-GGUF" "E4B Q8_0 (8.19 GB)" ;;
+    9)  do_gguf_model_download "*MXFP4_MOE*" "gemma-4-26B-A4B-it-GGUF" "26B-A4B MXFP4_MOE (16.7 GB)" ;;
+    10) do_gguf_model_download "*UD-Q4_K_M*" "gemma-4-26B-A4B-it-GGUF" "26B-A4B UD-Q4_K_M (16.9 GB)" ;;
+    11) do_gguf_model_download "*IQ4_XS*"    "gemma-4-26B-A4B-it-GGUF" "26B-A4B IQ4_XS (13.4 GB)" ;;
+    12) do_gguf_model_download "*Q8_0*"      "gemma-4-26B-A4B-it-GGUF" "26B-A4B Q8_0 (26.9 GB)" ;;
+    13) do_gguf_model_download "*Q4_K_M*" "gemma-4-31B-it-GGUF" "31B Q4_K_M (18.3 GB)" ;;
+    14) do_gguf_model_download "*IQ4_XS*" "gemma-4-31B-it-GGUF" "31B IQ4_XS (16.4 GB)" ;;
+    15) do_gguf_model_download "*Q8_0*"   "gemma-4-31B-it-GGUF" "31B Q8_0 (32.6 GB)" ;;
+    16)
         read -p "Enter HuggingFace model ID (e.g. google/gemma-4-E2B-it): " CUSTOM_ID
         if [ -n "$CUSTOM_ID" ]; then
             SAFE_NAME="${CUSTOM_ID//\//-}"

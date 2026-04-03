@@ -10,28 +10,44 @@ main_menu() {
     echo " Complete management interface for Gemma 4 models"
     echo "============================================================"
     echo ""
-    echo "  [1] Install Dependencies"
-    echo "  [2] Download Models"
-    echo "  [3] Start Interactive Chat"
-    echo "  [4] Run Benchmark / Quick Test"
-    echo "  [5] Show Model Information"
-    echo "  [6] Show System Information"
-    echo "  [7] Set HuggingFace Token"
-    echo "  [8] List Downloaded Models"
-    echo "  [9] Exit"
+    echo "  --- Setup ---"
+    echo "  [1] Install Dependencies (transformers baseline)"
+    echo "  [2] Install llama.cpp Dependencies (GPU GGUF)"
+    echo "  [3] Install vllm Dependencies (GPU API server)"
     echo ""
-    read -p "Enter choice [1-9]: " MAIN_CHOICE
+    echo "  --- Models ---"
+    echo "  [4] Download Models"
+    echo ""
+    echo "  --- Inference ---"
+    echo "  [5] Start Chat (transformers)"
+    echo "  [6] Start Chat (llama.cpp / GGUF)"
+    echo "  [7] Start vllm Server (OpenAI API)"
+    echo ""
+    echo "  --- Tools ---"
+    echo "  [8] Run Benchmark / Quick Test"
+    echo "  [9] Show Model Information"
+    echo "  [10] Show System Information"
+    echo "  [11] Set HuggingFace Token"
+    echo "  [12] List Downloaded Models"
+    echo ""
+    echo "  [0] Exit"
+    echo ""
+    read -p "Enter choice [0-12]: " MAIN_CHOICE
 
     case "$MAIN_CHOICE" in
+        0) echo ""; echo "Goodbye!"; exit 0 ;;
         1) run_install ;;
-        2) run_download ;;
-        3) run_chat ;;
-        4) run_benchmark ;;
-        5) show_model_info ;;
-        6) show_system_info ;;
-        7) set_token ;;
-        8) list_models ;;
-        9) echo ""; echo "Goodbye!"; exit 0 ;;
+        2) run_install_llamacpp ;;
+        3) run_install_vllm ;;
+        4) run_download ;;
+        5) run_chat ;;
+        6) run_chat_llamacpp ;;
+        7) run_vllm_server ;;
+        8) run_benchmark ;;
+        9) show_model_info ;;
+        10) show_system_info ;;
+        11) set_token ;;
+        12) list_models ;;
         *) echo "[ERROR] Invalid choice."; sleep 1; main_menu ;;
     esac
 }
@@ -40,6 +56,22 @@ run_install() {
     clear
     echo "[INFO] Launching dependency installer..."
     bash "$SCRIPT_DIR/install-dep.sh"
+    read -p "Press Enter to return to menu..."
+    main_menu
+}
+
+run_install_llamacpp() {
+    clear
+    echo "[INFO] Launching llama.cpp dependency installer..."
+    bash "$SCRIPT_DIR/install-dep-llamacpp.sh"
+    read -p "Press Enter to return to menu..."
+    main_menu
+}
+
+run_install_vllm() {
+    clear
+    echo "[INFO] Launching vllm dependency installer..."
+    bash "$SCRIPT_DIR/install-dep-vllm.sh"
     read -p "Press Enter to return to menu..."
     main_menu
 }
@@ -54,8 +86,24 @@ run_download() {
 
 run_chat() {
     clear
-    echo "[INFO] Launching interactive chat..."
+    echo "[INFO] Launching interactive chat (transformers)..."
     bash "$SCRIPT_DIR/start.sh"
+    read -p "Press Enter to return to menu..."
+    main_menu
+}
+
+run_chat_llamacpp() {
+    clear
+    echo "[INFO] Launching llama.cpp chat..."
+    bash "$SCRIPT_DIR/start-llamacpp.sh"
+    read -p "Press Enter to return to menu..."
+    main_menu
+}
+
+run_vllm_server() {
+    clear
+    echo "[INFO] Launching vllm server..."
+    bash "$SCRIPT_DIR/start-vllm.sh"
     read -p "Press Enter to return to menu..."
     main_menu
 }
@@ -153,38 +201,45 @@ PYEOF
 show_model_info() {
     clear
     echo "============================================================"
-    echo " Gemma 4 - Model Comparison"
+    echo " Gemma 4 - Model & GGUF Reference"
     echo "============================================================"
     echo ""
-    echo "  Model              HF ID                           Params   Context  Audio  VRAM(approx)"
-    echo "  ---------------    -----------------------------    -------  -------  -----  -----------"
-    echo "  E2B (Dense+PLE)    google/gemma-4-E2B-it           2.3B eff 128K     Yes    8 GB"
-    echo "  E4B (Dense+PLE)    google/gemma-4-E4B-it           4.5B eff 128K     Yes    12 GB"
-    echo "  26B-A4B (MoE)      google/gemma-4-26B-A4B-it       3.8B act 256K     No     32 GB"
-    echo "  31B (Dense)        google/gemma-4-31B-it           30.7B    256K     No     48 GB+"
+    echo " Full-precision HuggingFace Models:"
+    echo "  Model           HF ID                          Params   Context  Audio  VRAM"
+    echo "  E2B (Dense)     google/gemma-4-E2B-it          2.3B eff 128K     Yes    ~8 GB"
+    echo "  E4B (Dense)     google/gemma-4-E4B-it          4.5B eff 128K     Yes    ~12 GB"
+    echo "  26B-A4B (MoE)   google/gemma-4-26B-A4B-it      3.8B act 256K     No     ~32 GB"
+    echo "  31B (Dense)     google/gemma-4-31B-it          30.7B    256K     No     ~48 GB"
     echo ""
-    echo "  GGUF (26B-A4B)     unsloth/gemma-4-26B-A4B-it-GGUF"
-    echo "    IQ4_XS            13.4 GB   - Minimum quality, lowest VRAM"
-    echo "    Q4_K_M            16.9 GB   - Recommended balance"
-    echo "    Q8_0              26.9 GB   - Near full quality"
-    echo "    BF16              50.5 GB   - Full precision"
+    echo " GGUF - unsloth/gemma-4-E2B-it-GGUF:"
+    echo "  Q4_K_M  3.11 GB  Recommended"
+    echo "  Q8_0    5.05 GB  High quality"
+    echo "  BF16    9.31 GB  Full precision"
     echo ""
-    echo "  Architecture Key:"
-    echo "    PLE = Per-Layer Embeddings (on-device efficiency)"
-    echo "    MoE = Mixture of Experts (128 experts, 8 active per token)"
-    echo "    eff = effective compute parameters"
-    echo "    act = active parameters per forward pass"
+    echo " GGUF - unsloth/gemma-4-E4B-it-GGUF:"
+    echo "  Q4_K_M   4.98 GB  Recommended"
+    echo "  Q8_0     8.19 GB  High quality"
+    echo "  BF16    15.10 GB  Full precision"
     echo ""
-    echo "  Best for:"
-    echo "    Voice/Audio input    E2B or E4B (only models with audio encoder)"
-    echo "    Coding/Reasoning     31B > 26B-A4B > E4B"
-    echo "    On-device / Mobile   E2B"
-    echo "    Fast large model     26B-A4B (near 4B speed)"
-    echo "    Highest quality      31B"
+    echo " GGUF - unsloth/gemma-4-26B-A4B-it-GGUF (MoE):"
+    echo "  MXFP4_MOE  16.7 GB  MoE-optimized (unique quant)  Recommended"
+    echo "  UD-Q4_K_M  16.9 GB  Standard recommended"
+    echo "  IQ4_XS     13.4 GB  Smallest option"
+    echo "  Q8_0       26.9 GB  Near full quality"
+    echo "  BF16       50.5 GB  Full precision"
     echo ""
-    echo "  Recommended sampling:  temperature=1.0, top_p=0.95, top_k=64"
-    echo "  Document/OCR tasks:    Use image token budget 1120"
-    echo "  Video/fast tasks:      Use image token budget 70"
+    echo " GGUF - unsloth/gemma-4-31B-it-GGUF (most popular ~84K dl/month):"
+    echo "  Q4_K_M  18.3 GB  Recommended"
+    echo "  IQ4_XS  16.4 GB  Smallest 31B"
+    echo "  Q8_0    32.6 GB  Near full quality"
+    echo "  BF16    61.4 GB  Full precision"
+    echo ""
+    echo " Backend Comparison:"
+    echo "  transformers  Full HF weights  GPU+CPU  Multimodal  Easiest setup"
+    echo "  llama.cpp     GGUF quant       GPU+CPU  Text only   Best CPU/edge"
+    echo "  vllm          Full HF weights  GPU only Text only   Best throughput"
+    echo ""
+    echo " Recommended sampling: temperature=1.0, top_p=0.95, top_k=64"
     echo ""
     read -p "Press Enter to return to menu..."
     main_menu

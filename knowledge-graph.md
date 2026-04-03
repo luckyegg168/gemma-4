@@ -19,7 +19,60 @@ graph TD
 
     MOE --> B26["26B-A4B\ngoogle/gemma-4-26B-A4B-it\n25.2B total / 3.8B active\n256K ctx | Text+Image"]
 
-    B26 --> GGUF["GGUF Quants\nunsloth/gemma-4-26B-A4B-it-GGUF\nQ2 to BF16 (9.88 GB – 50.5 GB)"]
+    E2B --> GGUF_E2B["GGUF - unsloth/gemma-4-E2B-it-GGUF\nQ4_K_M 3.11GB | Q8_0 5.05GB | BF16 9.31GB"]
+    E4B --> GGUF_E4B["GGUF - unsloth/gemma-4-E4B-it-GGUF\nQ4_K_M 4.98GB | Q8_0 8.19GB | BF16 15.1GB"]
+    B26 --> GGUF_26B["GGUF - unsloth/gemma-4-26B-A4B-it-GGUF\nMXFP4_MOE 16.7GB | UD-Q4_K_M 16.9GB\nIQ4_XS 13.4GB | Q8_0 26.9GB | BF16 50.5GB"]
+    B31 --> GGUF_31B["GGUF - unsloth/gemma-4-31B-it-GGUF\nQ4_K_M 18.3GB | IQ4_XS 16.4GB\nQ8_0 32.6GB | BF16 61.4GB"]
+
+    GGUF_26B --> MXFP4["MXFP4_MOE\nUnique MoE-optimized quant\nOnly for 26B-A4B"]
+```
+
+---
+
+## 1b. Backend Ecosystem
+
+```mermaid
+graph LR
+    E2B2["E2B"] --> TF["transformers"]
+    E4B2["E4B"] --> TF
+    B26_2["26B-A4B"] --> TF
+    B31_2["31B"] --> TF
+
+    E2B2 --> LLCPP["llama.cpp\n(llama-cpp-python)\nGPU primary, CPU fallback"]
+    E4B2 --> LLCPP
+    B26_2 --> LLCPP
+    B31_2 --> LLCPP
+
+    E2B2 --> VLLM["vllm\nOpenAI-compatible API\nGPU ONLY"]
+    E4B2 --> VLLM
+    B26_2 --> VLLM
+    B31_2 --> VLLM
+
+    TF --> OUT["Text Output"]
+    LLCPP --> OUT
+    VLLM --> OUT
+```
+
+---
+
+## 1c. Toolkit Scripts
+
+```mermaid
+graph TD
+    MANAGER["manager.bat / manager.sh\n(Management Console)"]
+
+    MANAGER --> INST["install-dep.bat/.sh\n(transformers baseline)"]
+    MANAGER --> INST_LLC["install-dep-llamacpp.bat/.sh\n(GPU CUDA GGUF)"]
+    MANAGER --> INST_VLLM["install-dep-vllm.bat/.sh\n(GPU vllm server)"]
+    MANAGER --> DL["download-models.bat/.sh\n(16-option menu)"]
+    MANAGER --> CHAT["start.bat/.sh\n(transformers chat)"]
+    MANAGER --> CHAT_LLC["start-llamacpp.bat/.sh\n(GGUF chat, 12 models)"]
+    MANAGER --> CHAT_VLLM["start-vllm.bat/.sh\n(server + client)"]
+
+    INST_LLC --> LLCPP2["llama-cpp-python\nCUDA 12.1/11.8 wheel\nor source build"]
+    INST_VLLM --> VLLM2["vllm + PyTorch CUDA\nOpenAI SDK"]
+    CHAT_LLC --> GGUF_FILES["GGUF files\n(Q4_K_M, Q8_0, etc.)"]
+    CHAT_VLLM --> API["http://localhost:8000/v1"]
 ```
 
 ---

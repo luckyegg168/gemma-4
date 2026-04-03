@@ -50,85 +50,133 @@ All models are released under the **Apache 2.0 license** and require accepting [
 
 ### VRAM Requirements
 
-| Model | Min VRAM | Notes |
+| Model / Backend | Min VRAM | Notes |
 |---|---|---|
-| E2B | 8 GB | Runs on consumer GPU |
-| E4B | 12 GB | RTX 3080 / 4070 |
-| 26B-A4B | 32 GB | A100 40GB or 2× consumer |
-| 26B-A4B Q4_K_M (GGUF) | **18 GB** | RTX 3090 / 4090 |
-| 26B-A4B IQ4_XS (GGUF) | **14 GB** | RTX 3080 12GB |
-| 31B | 48 GB+ | A100 80GB |
+| E2B full precision | 8 GB | Consumer GPU |
+| E4B full precision | 12 GB | RTX 3080 / 4070 |
+| **E2B Q4_K_M GGUF** | **4 GB** | llama.cpp — very fast |
+| **E4B Q4_K_M GGUF** | **6 GB** | llama.cpp |
+| **26B-A4B IQ4_XS GGUF** | **14 GB** | llama.cpp — RTX 3080 12GB |
+| **26B-A4B MXFP4_MOE GGUF** | **18 GB** | llama.cpp — MoE optimized |
+| **26B-A4B UD-Q4_K_M GGUF** | **18 GB** | llama.cpp — recommended |
+| **31B Q4_K_M GGUF** | **20 GB** | llama.cpp — most popular (~84K dl/mo) |
+| 26B-A4B vllm | 32 GB | A100 40GB — GPU only |
+| 31B vllm | 48 GB+ | A100 80GB — GPU only |
 
 ---
 
 ## 3. File Structure
 
 ```
-d:\gemma-4\                   (or ~/gemma-4 on Linux)
-├── README.md                 ← This file
-├── SKILL.md                  ← Complete knowledge reference (13 sections)
-├── knowledge-graph.md        ← Mermaid diagrams + relationship maps
+d:\gemma-4\                         (or ~/gemma-4 on Linux)
+├── README.md                       ← This file
+├── SKILL.md                        ← Complete knowledge reference (13 sections)
+├── knowledge-graph.md              ← Mermaid diagrams + relationship maps
 └── scripts/
     ├── windows/
-    │   ├── install-dep.bat   ← Install Python dependencies
-    │   ├── download-models.bat ← Download model weights from HuggingFace
-    │   ├── start.bat         ← Interactive chat session
-    │   └── manager.bat       ← Full management console (all-in-one)
+    │   ├── install-dep.bat         ← Install transformers/torch baseline
+    │   ├── install-dep-llamacpp.bat ← Install llama-cpp-python (GPU CUDA)
+    │   ├── install-dep-vllm.bat    ← Install vllm (GPU server)
+    │   ├── download-models.bat     ← Download HF models + GGUF files (16 options)
+    │   ├── start.bat               ← Interactive chat (transformers)
+    │   ├── start-llamacpp.bat      ← Interactive chat (llama.cpp GGUF, 12 models)
+    │   ├── start-vllm.bat          ← vllm server + OpenAI client
+    │   └── manager.bat             ← Full management console (13-option menu)
     └── linux/
-        ├── install-dep.sh    ← Install Python dependencies
-        ├── download-models.sh ← Download model weights from HuggingFace
-        ├── start.sh          ← Interactive chat session
-        └── manager.sh        ← Full management console (all-in-one)
+        ├── install-dep.sh          ← Install transformers/torch baseline
+        ├── install-dep-llamacpp.sh ← Install llama-cpp-python (GPU CUDA)
+        ├── install-dep-vllm.sh     ← Install vllm (GPU server)
+        ├── download-models.sh      ← Download HF models + GGUF files (16 options)
+        ├── start.sh                ← Interactive chat (transformers)
+        ├── start-llamacpp.sh       ← Interactive chat (llama.cpp GGUF, 12 models)
+        ├── start-vllm.sh           ← vllm server + OpenAI client
+        └── manager.sh              ← Full management console (13-option menu)
 ```
 
 ---
 
 ## 4. Quick Start
 
-### Windows
+### Option A — Transformers (default backend)
 
 ```batch
+REM Windows
 cd d:\gemma-4\scripts\windows
-
-REM All-in-one: install deps, download models, start chat
-manager.bat
-
-REM Or step by step:
 install-dep.bat
-download-models.bat
+download-models.bat        REM choose [1]-[4] for full HF models
 start.bat
 ```
 
-### Linux / macOS
-
 ```bash
-cd ~/gemma-4/scripts/linux
-
-# Make all scripts executable first
-chmod +x *.sh
-
-# All-in-one management console
-./manager.sh
-
-# Or step by step:
+# Linux
+cd ~/gemma-4/scripts/linux && chmod +x *.sh
 ./install-dep.sh
-./download-models.sh
+./download-models.sh       # choose [1]-[4] for full HF models
 ./start.sh
 ```
 
-### Python (direct)
+### Option B — llama.cpp / GGUF (GPU primary, CPU fallback)
+
+```batch
+REM Windows
+cd d:\gemma-4\scripts\windows
+install-dep-llamacpp.bat
+download-models.bat        REM choose [5]-[15] for GGUF files
+start-llamacpp.bat
+```
+
+```bash
+# Linux
+cd ~/gemma-4/scripts/linux && chmod +x *.sh
+./install-dep-llamacpp.sh
+./download-models.sh       # choose [5]-[15] for GGUF files (e.g. [9] 26B-A4B MXFP4_MOE, [13] 31B Q4_K_M)
+./start-llamacpp.sh
+```
+
+> **Recommended GGUF choices:** 31B Q4_K_M `[13]` for max quality; 26B-A4B MXFP4_MOE `[9]` for MoE efficiency; E2B Q4_K_M `[5]` for minimum VRAM.
+
+### Option C — vllm (GPU-only OpenAI API server)
+
+> ⚠️ **vllm requires an NVIDIA GPU with CUDA.** CPU mode is NOT supported.
+
+```batch
+REM Windows
+cd d:\gemma-4\scripts\windows
+install-dep-vllm.bat
+start-vllm.bat             REM [1] Start server → [2] Chat client (or [3] Combined)
+```
+
+```bash
+# Linux
+cd ~/gemma-4/scripts/linux && chmod +x *.sh
+./install-dep-vllm.sh
+./start-vllm.sh            # [1] Server foreground  [2] Server background  [3] Client only  [4] Combined
+```
+
+The vllm server exposes an OpenAI-compatible API at `http://localhost:8000/v1`.
+
+### Option D — Management Console (all-in-one)
+
+```batch
+REM Windows
+manager.bat
+```
+
+```bash
+# Linux
+./manager.sh
+```
+
+### Python (direct — transformers)
 
 ```python
 from transformers import AutoProcessor, AutoModelForCausalLM
-import torch
 
 model_id = "google/gemma-4-E2B-it"
 processor = AutoProcessor.from_pretrained(model_id)
 model = AutoModelForCausalLM.from_pretrained(model_id, dtype="auto", device_map="auto")
 
-messages = [
-    {"role": "user", "content": "Hello, Gemma!"}
-]
+messages = [{"role": "user", "content": "Hello, Gemma!"}]
 text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 inputs = processor(text=text, return_tensors="pt").to(model.device)
 input_len = inputs["input_ids"].shape[-1]
@@ -175,76 +223,158 @@ print(processor.decode(outputs[0][input_len:], skip_special_tokens=True))
 
 ## 6. Script Reference
 
-### `install-dep.bat` / `install-dep.sh`
+### `install-dep.bat` / `install-dep.sh` — Transformers Baseline
 
-Installs all Python dependencies step by step:
+Installs all Python dependencies (interactive, step-by-step):
 1. Checks Python installation
 2. Upgrades pip
 3. Installs `transformers`, `torch`, `accelerate`
 4. Installs `huggingface_hub` (and CLI)
 5. Installs `Pillow`, `librosa`, `soundfile` (multimodal)
-6. Optionally installs `flash-attn` (Linux, CUDA)
-7. Optionally installs `llama-cpp-python` (GGUF support)
-
-Run this once before using any other scripts.
+6. Optionally installs `flash-attn` (Linux CUDA only)
+7. Optionally installs `llama-cpp-python` (CPU-only, basic)
 
 ---
 
-### `download-models.bat` / `download-models.sh`
+### `install-dep-llamacpp.bat` / `install-dep-llamacpp.sh` — llama-cpp-python (CUDA)
+
+Installs `llama-cpp-python` with GPU acceleration. Auto-detects CUDA:
+1. Detects NVIDIA GPU via `nvidia-smi` / `nvcc`
+2. Tries pre-built CUDA 12.1 wheel → CUDA 11.8 wheel
+3. Falls back to source build with `CMAKE_ARGS=-DGGML_CUDA=on`
+4. Falls back to CPU-only if no GPU available
+5. Verifies: `from llama_cpp import Llama`
+
+---
+
+### `install-dep-vllm.bat` / `install-dep-vllm.sh` — vllm (GPU Server)
+
+> ⚠️ Requires NVIDIA GPU with CUDA.
+
+Installs [vllm](https://github.com/vllm-project/vllm) and OpenAI-compatible client:
+1. Checks `nvidia-smi` (required)
+2. Installs PyTorch with CUDA 12.1 (→ 11.8 fallback)
+3. Installs `vllm`
+4. Installs `openai` Python SDK
+5. Installs `huggingface_hub`, `transformers`, `accelerate`
+6. Verifies: `import vllm`
+
+---
+
+### `download-models.bat` / `download-models.sh` — Download Models (16 options)
 
 Downloads model weights from HuggingFace. Menu options:
 
-| Option | Model | Size |
-|---|---|---|
-| [1] | E2B full precision | ~10 GB |
-| [2] | E4B full precision | ~16 GB |
-| [3] | 26B-A4B full precision | ~50 GB |
-| [4] | 31B full precision | ~62 GB |
-| [5] | 26B-A4B Q4_K_M GGUF | 16.9 GB |
-| [6] | 26B-A4B IQ4_XS GGUF | 13.4 GB |
-| [7] | 26B-A4B Q8_0 GGUF | 26.9 GB |
-| [8] | All GGUF variants | variable |
-| [9] | Custom model ID | varies |
+| Option | Model | Backend | Size |
+|---|---|---|---|
+| [1] | E2B full precision | transformers | ~10 GB |
+| [2] | E4B full precision | transformers | ~16 GB |
+| [3] | 26B-A4B full precision | transformers | ~50 GB |
+| [4] | 31B full precision | transformers | ~62 GB |
+| [5] | E2B Q4_K_M GGUF ⭐ | llama.cpp | 3.11 GB |
+| [6] | E2B Q8_0 GGUF | llama.cpp | 5.05 GB |
+| [7] | E4B Q4_K_M GGUF ⭐ | llama.cpp | 4.98 GB |
+| [8] | E4B Q8_0 GGUF | llama.cpp | 8.19 GB |
+| [9] | 26B-A4B MXFP4_MOE GGUF ⭐ (unique!) | llama.cpp | 16.7 GB |
+| [10] | 26B-A4B UD-Q4_K_M GGUF ⭐ | llama.cpp | 16.9 GB |
+| [11] | 26B-A4B IQ4_XS GGUF | llama.cpp | 13.4 GB |
+| [12] | 26B-A4B Q8_0 GGUF | llama.cpp | 26.9 GB |
+| [13] | 31B Q4_K_M GGUF ⭐ (most popular) | llama.cpp | 18.3 GB |
+| [14] | 31B IQ4_XS GGUF | llama.cpp | 16.4 GB |
+| [15] | 31B Q8_0 GGUF | llama.cpp | 32.6 GB |
+| [16] | Custom model ID | any | varies |
+
+> ⭐ = recommended choice for the model
+
+---
+
+### `start.bat` / `start.sh` — Interactive Chat (transformers)
+
+Loads models via 🤗 `transformers`. Features:
+- Select model from menu (E2B / E4B / 26B-A4B / 31B)
+- Automatic `device_map="auto"` (GPU if available)
+- Streaming token output
+- Commands during chat: `quit`/`exit` to stop, `reset` to clear history
+
+---
+
+### `start-llamacpp.bat` / `start-llamacpp.sh` — Interactive Chat (llama.cpp GGUF)
+
+Loads GGUF files via `llama-cpp-python`. 12-option model menu:
+
+| Menu | Model | File | GPU Layers |
+|---|---|---|---|
+| [1] | E2B Q4_K_M | `gemma-4-E2B-it-Q4_K_M.gguf` | 35 |
+| [2] | E2B Q8_0 | `gemma-4-E2B-it-Q8_0.gguf` | 35 |
+| [3] | E2B IQ4_XS | `gemma-4-E2B-it-IQ4_XS.gguf` | 35 |
+| [4] | E4B Q4_K_M | `gemma-4-E4B-it-Q4_K_M.gguf` | 42 |
+| [5] | E4B Q8_0 | `gemma-4-E4B-it-Q8_0.gguf` | 42 |
+| [6] | 26B-A4B MXFP4_MOE ⭐ | `gemma-4-26B-A4B-it-MXFP4_MOE.gguf` | 30 |
+| [7] | 26B-A4B UD-Q4_K_M | `gemma-4-26B-A4B-it-UD-Q4_K_M.gguf` | 30 |
+| [8] | 26B-A4B Q8_0 | `gemma-4-26B-A4B-it-Q8_0.gguf` | 30 |
+| [9] | 31B Q4_K_M ⭐ | `gemma-4-31B-it-Q4_K_M.gguf` | 60 |
+| [10] | 31B IQ4_XS | `gemma-4-31B-it-IQ4_XS.gguf` | 60 |
+| [11] | 31B Q8_0 | `gemma-4-31B-it-Q8_0.gguf` | 60 |
+| [12] | Custom | user-specified path | user-specified |
+
+- Default context: `4096` tokens (customizable per session)
+- GPU primary (`n_gpu_layers=-1`), falls back to CPU if no GPU
+- Chat format: `gemma`; sampling: `temperature=1.0`, `top_p=0.95`, `top_k=64`
+
+---
+
+### `start-vllm.bat` — vllm Server + Client (Windows)
+
+> ⚠️ GPU required.
+
+4 modes:
+| Mode | Description |
+|---|---|
+| [1] Start vllm Server | Runs server in foreground (blocks terminal) |
+| [2] Chat Client | Connects to existing server at localhost:8000 |
+| [3] Start Server + Client | New window for server, waits 30s, launches client |
+| [4] Test Connection | Checks if server is running, lists loaded model |
+
+---
+
+### `start-vllm.sh` — vllm Server + Client (Linux)
+
+> ⚠️ GPU required.
+
+5 modes:
+| Mode | Description |
+|---|---|
+| [1] Server (foreground) | Blocks terminal, Ctrl+C to stop |
+| [2] Server (background) | `nohup` — survives terminal close, logs to `vllm_server.log` |
+| [3] Chat client | Connects to running server |
+| [4] Server + client | Background server + 30s wait + client |
+| [5] Test / status | Checks server + lists active model |
+
+Server API endpoint: `http://localhost:8000/v1`
+
+---
+
+### `manager.bat` / `manager.sh` — Full Management Console (13-option menu)
+
+| Option | Description |
+|---|---|
+| [1] Install Dependencies (transformers) | Run `install-dep` |
+| [2] Install Dependencies (llama.cpp CUDA) | Run `install-dep-llamacpp` |
+| [3] Install Dependencies (vllm GPU) | Run `install-dep-vllm` |
+| [4] Download Models | Run `download-models` (16 options) |
+| [5] Start Chat (transformers) | Run `start` |
+| [6] Start Chat (llama.cpp GGUF) | Run `start-llamacpp` |
+| [7] Start vllm Server | Run `start-vllm` |
+| [8] Set HuggingFace Token | Save `HF_TOKEN` to `.env` |
+| [9] List Downloaded Models | Scan models directory |
+| [10] Show Model Info | GGUF tables + benchmark + backend comparison |
+| [11] Check GPU Info | `nvidia-smi` output |
+| [12] Check Python Environment | Installed packages + versions |
+| [0] Exit | — |
 
 Downloaded models are saved to `~/gemma4-models/` by default.
 
 To use a locally downloaded model, pass the folder path as model ID in `start.bat` / `start.sh`.
-
----
-
-### `start.bat` / `start.sh`
-
-Launches an interactive multi-turn chat session:
-
-1. Select model (E2B / E4B / 26B-A4B / 31B / custom)
-2. Toggle thinking mode (on/off)
-3. Set system prompt
-4. Set max tokens per response
-5. Chat interactively
-
-**Session commands:**
-- `exit` or `quit` — end session
-- `reset` — clear conversation history
-
-Thinking traces are displayed but **never stored in history** (best practice for multi-turn coherence).
-
----
-
-### `manager.bat` / `manager.sh`
-
-All-in-one management console with these options:
-
-| Option | Function |
-|---|---|
-| [1] Install Dependencies | Calls install-dep script |
-| [2] Download Models | Calls download-models script |
-| [3] Start Interactive Chat | Calls start script |
-| [4] Run Benchmark | Quick speed/quality test across 3 prompts |
-| [5] Show Model Information | Architecture comparison table |
-| [6] Show System Information | Python, PyTorch, CUDA, GPU info |
-| [7] Set HuggingFace Token | Login to HuggingFace CLI |
-| [8] List Downloaded Models | Scan local models directory |
-| [9] Exit | Quit |
 
 ---
 

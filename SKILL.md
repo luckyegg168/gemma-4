@@ -71,38 +71,112 @@ Gemma 4 is Google DeepMind's fourth generation of open-weight, multimodal langua
 
 ---
 
-## 3. GGUF Quantization (unsloth/gemma-4-26B-A4B-it-GGUF)
+## 3. GGUF Quantization — All Models
 
-Available from [unsloth/gemma-4-26B-A4B-it-GGUF](https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF).  
-Use these quantizations with **llama.cpp** or any GGUF-compatible runtime.
+All GGUF files are provided by [Unsloth Dynamic 2.0](https://unsloth.ai/blog/unsloth-dynamic). The `UD-*` prefixed quantizations use Unsloth's proprietary scheme which achieves superior accuracy vs standard GGUF quants at the same bit width. Use these with **llama.cpp**, **LM Studio**, **Ollama**, or any GGUF-compatible runtime.
 
-| Bits | Quantization | File Size |
-|---|---|---|
-| 2-bit | UD-IQ2_XXS | 9.88 GB |
-| 2-bit | UD-IQ2_M | 9.97 GB |
-| 2-bit | UD-Q2_K_XL | 10.5 GB |
-| 3-bit | UD-IQ3_XXS | 11.2 GB |
-| 3-bit | UD-IQ3_S | 11.2 GB |
-| 3-bit | UD-Q3_K_S | 12.5 GB |
-| 3-bit | UD-Q3_K_M | 12.5 GB |
-| 3-bit | UD-Q3_K_XL | 12.9 GB |
-| 4-bit | UD-IQ4_XS | 13.4 GB |
-| 4-bit | UD-IQ4_NL | 13.4 GB |
-| 4-bit | UD-Q4_K_S | 16.4 GB |
-| 4-bit | MXFP4_MOE | 16.7 GB |
-| 4-bit | UD-Q4_K_M | 16.9 GB |
-| 4-bit | UD-Q4_K_XL | 17.1 GB |
-| 5-bit | UD-Q5_K_S | 18.8 GB |
-| 5-bit | UD-Q5_K_M | 21.2 GB |
-| 5-bit | UD-Q5_K_XL | 21.3 GB |
-| 6-bit | UD-Q6_K | 22.9 GB |
-| 6-bit | UD-Q6_K_XL | 23.8 GB |
-| 8-bit | Q8_0 | 26.9 GB |
-| 8-bit | UD-Q8_K_XL | 27.9 GB |
-| 16-bit | BF16 | 50.5 GB |
+### 3.1 E2B GGUF — `unsloth/gemma-4-E2B-it-GGUF`
+5B total params (2.3B effective) · ~37,000 downloads/month
 
-**Recommended:** `UD-Q4_K_M` (16.9 GB) for balance of quality and memory.  
-**Minimum VRAM 8GB:** `UD-IQ4_XS` or `UD-IQ4_NL` (13.4 GB) with CPU offloading.
+| Bits | Quantization | File Size | Notes |
+|---|---|---|---|
+| 2-bit | UD-IQ2_M | 2.29 GB | Very low quality, minimum size |
+| 2-bit | UD-Q2_K_XL | 2.40 GB | |
+| 3-bit | Q3_K_S | 2.45 GB | |
+| 3-bit | Q3_K_M | 2.54 GB | |
+| 3-bit | UD-Q3_K_XL | 2.92 GB | |
+| 4-bit | IQ4_XS | 2.98 GB | Good small option |
+| 4-bit | Q4_K_S | 3.04 GB | |
+| **4-bit** | **Q4_K_M** ⭐ | **3.11 GB** | **Recommended default** |
+| 4-bit | UD-Q4_K_XL | 3.17 GB | |
+| 5-bit | Q5_K_S | 3.32 GB | |
+| 5-bit | Q5_K_M | 3.36 GB | |
+| 6-bit | Q6_K | 4.50 GB | Near-lossless |
+| **8-bit** | **Q8_0** | **5.05 GB** | **Highest GGUF quality** |
+| 16-bit | BF16 | 9.31 GB | Full precision |
+
+### 3.2 E4B GGUF — `unsloth/gemma-4-E4B-it-GGUF`
+8B total params (4.5B effective) · ~59,000 downloads/month
+
+| Bits | Quantization | File Size | Notes |
+|---|---|---|---|
+| 2-bit | UD-IQ2_M | 3.53 GB | Very low quality |
+| 3-bit | Q3_K_S | 3.86 GB | |
+| 3-bit | Q3_K_M | 4.06 GB | |
+| 4-bit | IQ4_XS | 4.72 GB | Good small option |
+| 4-bit | Q4_K_S | 4.84 GB | |
+| **4-bit** | **Q4_K_M** ⭐ | **4.98 GB** | **Recommended default** |
+| 4-bit | UD-Q4_K_XL | 5.10 GB | |
+| 5-bit | Q5_K_S | 5.40 GB | |
+| 5-bit | Q5_K_M | 5.48 GB | |
+| 6-bit | Q6_K | 7.07 GB | Near-lossless |
+| **8-bit** | **Q8_0** | **8.19 GB** | **Highest GGUF quality** |
+| 16-bit | BF16 | 15.1 GB | Full precision |
+
+### 3.3 26B-A4B GGUF — `unsloth/gemma-4-26B-A4B-it-GGUF`
+25.2B total params (3.8B active MoE) · Unique MXFP4_MOE variant
+
+| Bits | Quantization | File Size | Notes |
+|---|---|---|---|
+| 2-bit | UD-IQ2_XXS | 9.88 GB | Very low quality |
+| 2-bit | UD-IQ2_M | 9.97 GB | |
+| 2-bit | UD-Q2_K_XL | 10.5 GB | |
+| 3-bit | UD-IQ3_XXS | 11.2 GB | |
+| 3-bit | UD-IQ3_S | 11.2 GB | |
+| 3-bit | UD-Q3_K_S | 12.5 GB | |
+| 3-bit | UD-Q3_K_M | 12.5 GB | |
+| 3-bit | UD-Q3_K_XL | 12.9 GB | |
+| 4-bit | UD-IQ4_XS | 13.4 GB | Min VRAM ~14 GB |
+| 4-bit | UD-IQ4_NL | 13.4 GB | |
+| 4-bit | UD-Q4_K_S | 16.4 GB | |
+| **4-bit** | **MXFP4_MOE** ⭐ | **16.7 GB** | **MoE-optimized quant, unique to this model** |
+| **4-bit** | **UD-Q4_K_M** ⭐ | **16.9 GB** | **Recommended default** |
+| 4-bit | UD-Q4_K_XL | 17.1 GB | |
+| 5-bit | UD-Q5_K_S | 18.8 GB | |
+| 5-bit | UD-Q5_K_M | 21.2 GB | |
+| 5-bit | UD-Q5_K_XL | 21.3 GB | |
+| 6-bit | UD-Q6_K | 22.9 GB | Near-lossless |
+| 6-bit | UD-Q6_K_XL | 23.8 GB | |
+| **8-bit** | **Q8_0** | **26.9 GB** | **Highest GGUF quality** |
+| 8-bit | UD-Q8_K_XL | 27.9 GB | |
+| 16-bit | BF16 | 50.5 GB | Full precision |
+
+### 3.4 31B GGUF — `unsloth/gemma-4-31B-it-GGUF`
+30.7B params · ~84,000 downloads/month (most popular Gemma 4 GGUF!)
+
+| Bits | Quantization | File Size | Notes |
+|---|---|---|---|
+| 2-bit | UD-IQ2_XXS | 8.53 GB | Very low quality |
+| 2-bit | UD-IQ2_M | 10.8 GB | |
+| 2-bit | UD-Q2_K_XL | 11.8 GB | |
+| 3-bit | Q3_K_S | 13.2 GB | |
+| 3-bit | Q3_K_M | 14.7 GB | |
+| 3-bit | UD-Q3_K_XL | 15.3 GB | |
+| **4-bit** | **IQ4_XS** | **16.4 GB** | **Min VRAM ~17 GB** |
+| 4-bit | Q4_K_S | 17.4 GB | |
+| **4-bit** | **Q4_K_M** ⭐ | **18.3 GB** | **Recommended default** |
+| 4-bit | UD-Q4_K_XL | 18.8 GB | |
+| 5-bit | Q5_K_S | 21.1 GB | |
+| 5-bit | Q5_K_M | 21.7 GB | |
+| 5-bit | UD-Q5_K_XL | 21.9 GB | |
+| 6-bit | Q6_K | 25.2 GB | Near-lossless |
+| 6-bit | UD-Q6_K_XL | 27.5 GB | |
+| **8-bit** | **Q8_0** | **32.6 GB** | **Highest GGUF quality** |
+| 8-bit | UD-Q8_K_XL | 35.0 GB | |
+| 16-bit | BF16 | 61.4 GB | Full precision |
+
+### 3.5 GGUF Quick-Pick Summary
+
+| Model | GPU VRAM | Recommended Quant | Size |
+|---|---|---|---|
+| E2B | 4 GB+ | Q4_K_M | 3.11 GB |
+| E2B | 6 GB+ | Q8_0 | 5.05 GB |
+| E4B | 6 GB+ | Q4_K_M | 4.98 GB |
+| E4B | 10 GB+ | Q8_0 | 8.19 GB |
+| 26B-A4B | 16 GB+ | MXFP4_MOE / UD-Q4_K_M | ~17 GB |
+| 26B-A4B | 28 GB+ | Q8_0 | 26.9 GB |
+| 31B | 20 GB+ | Q4_K_M | 18.3 GB |
+| 31B | 36 GB+ | Q8_0 | 32.6 GB |
 
 ---
 
@@ -359,6 +433,67 @@ huggingface-cli download unsloth/gemma-4-26B-A4B-it-GGUF \
     --temp 1.0 --top-p 0.95 --top-k 64
 ```
 
+### 8.6 vllm — OpenAI-Compatible GPU Serving
+vllm provides high-throughput GPU inference with an OpenAI-compatible REST API.  
+Supports all four Gemma 4 full-precision HF models. GPU required.
+
+```bash
+# Install vllm
+pip install vllm
+
+# Start the OpenAI-compatible server (GPU)
+python -m vllm.entrypoints.openai.api_server \
+    --model google/gemma-4-E4B-it \
+    --port 8000 \
+    --dtype bfloat16 \
+    --max-model-len 8192
+
+# For 26B-A4B MoE model (enable expert parallelism if needed)
+python -m vllm.entrypoints.openai.api_server \
+    --model google/gemma-4-26B-A4B-it \
+    --port 8000 \
+    --dtype bfloat16 \
+    --max-model-len 16384 \
+    --gpu-memory-utilization 0.95
+
+# Query via Python client (OpenAI SDK)
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:8000/v1", api_key="token-abc123")
+
+response = client.chat.completions.create(
+    model="google/gemma-4-E4B-it",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Explain mixture of experts."},
+    ],
+    temperature=1.0,
+    top_p=0.95,
+    max_tokens=512,
+)
+print(response.choices[0].message.content)
+```
+
+```bash
+# Query via curl
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "google/gemma-4-E4B-it",
+    "messages": [{"role": "user", "content": "Hello!"}],
+    "temperature": 1.0,
+    "top_p": 0.95,
+    "max_tokens": 256
+  }'
+```
+
+**vllm Notes:**
+- GPU only (CUDA 11.8+); does not support CPU inference
+- Supports tensor parallelism: add `--tensor-parallel-size 2` for multi-GPU
+- E2B/E4B: fit on single 16–24 GB GPU  
+- 26B-A4B: requires ~32 GB VRAM (BF16); use `--dtype float16` to reduce
+- 31B: requires ~64 GB VRAM; use multi-GPU with tensor parallelism
+
 ---
 
 ## 9. Model Selection Guide
@@ -392,11 +527,25 @@ huggingface-cli download unsloth/gemma-4-26B-A4B-it-GGUF \
 
 ### GGUF / llama.cpp (Quantized)
 
-| Quantization | Model | VRAM Needed |
+| Model | Quantization | File Size | Min VRAM |
+|---|---|---|---|
+| E2B | Q4_K_M | 3.11 GB | 4 GB |
+| E2B | Q8_0 | 5.05 GB | 6 GB |
+| E4B | Q4_K_M | 4.98 GB | 6 GB |
+| E4B | Q8_0 | 8.19 GB | 10 GB |
+| 26B-A4B | MXFP4_MOE / UD-Q4_K_M | ~17 GB | 18 GB |
+| 26B-A4B | Q8_0 | 26.9 GB | 30 GB |
+| 31B | Q4_K_M | 18.3 GB | 20 GB |
+| 31B | Q8_0 | 32.6 GB | 36 GB |
+
+### vllm (GPU Full-Precision Serving)
+
+| Model | Min VRAM (BF16) | Recommended |
 |---|---|---|
-| Q4_K_M (26B-A4B) | 26B-A4B | ~17 GB |
-| IQ4_XS (26B-A4B) | 26B-A4B | ~13.4 GB |
-| Q4_K_M (31B) | 31B | ~20 GB (approx) |
+| E2B | 8 GB | 12 GB |
+| E4B | 12 GB | 16 GB |
+| 26B-A4B | 32 GB | 40 GB |
+| 31B | 48 GB | 2× 40 GB or A100 80 GB |
 
 ---
 
@@ -436,8 +585,20 @@ flash-attn>=2.5.0       # Flash Attention 2 (Linux + CUDA)
 
 ### llama.cpp (GGUF)
 ```
-llama-cpp-python>=0.2.0
-# or build llama.cpp from source with CUDA/Metal/Vulkan support
+llama-cpp-python>=0.2.0          # CPU-only build
+
+# GPU (CUDA 12.1) — recommended
+# Windows/Linux: install via pre-built wheel
+CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python
+# or via wheel index:
+pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121
+```
+
+### vllm (GPU High-Throughput Serving)
+```
+vllm>=0.4.0             # GPU inference + OpenAI-compatible API server
+openai>=1.0.0           # Client SDK for vllm API
+# Requires CUDA 11.8+ and NVIDIA GPU
 ```
 
 ---
@@ -452,9 +613,14 @@ llama-cpp-python>=0.2.0
 | Launch Blog | https://blog.google/innovation-and-ai/technology/developers-tools/gemma-4/ |
 | Responsible AI Toolkit | https://ai.google.dev/responsible |
 | Apache 2.0 License | https://ai.google.dev/gemma/docs/gemma_4_license |
-| Unsloth GGUF | https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF |
+| **HF: E2B-it** | https://huggingface.co/google/gemma-4-E2B-it |
+| **HF: E4B-it** | https://huggingface.co/google/gemma-4-E4B-it |
+| **HF: 26B-A4B-it** | https://huggingface.co/google/gemma-4-26B-A4B-it |
+| **HF: 31B-it** | https://huggingface.co/google/gemma-4-31B-it |
+| **GGUF: E2B** | https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF |
+| **GGUF: E4B** | https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF |
+| **GGUF: 26B-A4B** | https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF |
+| **GGUF: 31B** | https://huggingface.co/unsloth/gemma-4-31B-it-GGUF |
 | Unsloth Run Guide | https://docs.unsloth.ai/models/gemma-4 |
-| E2B IT | https://huggingface.co/google/gemma-4-E2B-it |
-| E4B IT | https://huggingface.co/google/gemma-4-E4B-it |
-| 26B-A4B IT | https://huggingface.co/google/gemma-4-26B-A4B-it |
-| 31B IT | https://huggingface.co/google/gemma-4-31B-it |
+| vllm Documentation | https://docs.vllm.ai |
+| llama-cpp-python | https://github.com/abetlen/llama-cpp-python |
