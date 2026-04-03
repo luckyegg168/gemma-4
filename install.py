@@ -4,11 +4,11 @@ install.py — Cross-platform installer for Gemma 4 dependencies
 Works on Windows, Linux, and macOS.
 
 Usage:
-    python install.py            # interactive menu
-    python install.py --base     # transformers baseline only
-    python install.py --llamacpp # llama-cpp-python (GPU CUDA)
-    python install.py --vllm     # vllm (GPU server, Linux only)
-    python install.py --all      # all of the above
+    python3 install.py            # interactive menu
+    python3 install.py --base     # transformers baseline only
+    python3 install.py --llamacpp # llama-cpp-python (GPU CUDA)
+    python3 install.py --vllm     # vllm (GPU server, Linux only)
+    python3 install.py --all      # all of the above
 """
 
 import subprocess

@@ -4,7 +4,8 @@ install.py — Linux installer for Gemma 4 dependencies
 Linux-specific: checks system packages, RAM/disk, GPU, and HF token.
 
 Usage:
-    python3 install.py            # interactive menu
+    ./install.py            # interactive menu  (chmod +x first)
+    python3 install.py      # interactive menu
     python3 install.py --base     # transformers baseline
     python3 install.py --llamacpp # llama-cpp-python (GPU CUDA)
     python3 install.py --vllm     # vllm (GPU server)
